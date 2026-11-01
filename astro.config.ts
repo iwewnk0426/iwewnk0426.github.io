@@ -1,112 +1,139 @@
-import mdx from '@astrojs/mdx'
-import partytown from '@astrojs/partytown'
-import sitemap from '@astrojs/sitemap'
-import Compress from 'astro-compress'
-import { defineConfig } from 'astro/config'
+import { rehypeHeadingIds } from '@astrojs/markdown-remark'
+import AstroPureIntegration from 'astro-pure'
+import { defineConfig, fontProviders, svgoOptimizer } from 'astro/config'
 import rehypeKatex from 'rehype-katex'
-import rehypeMermaid from 'rehype-mermaid'
-import rehypeSlug from 'rehype-slug'
-import remarkDirective from 'remark-directive'
 import remarkMath from 'remark-math'
-import UnoCSS from 'unocss/astro'
-import { base, defaultLocale, themeConfig } from './src/config'
-import { langMap } from './src/i18n/config'
-import { rehypeCodeCopyButton } from './src/plugins/rehype-code-copy-button.mjs'
-import { rehypeExternalLinks } from './src/plugins/rehype-external-links.mjs'
-import { rehypeHeadingAnchor } from './src/plugins/rehype-heading-anchor.mjs'
-import { rehypeImageProcessor } from './src/plugins/rehype-image-processor.mjs'
-import { remarkContainerDirectives } from './src/plugins/remark-container-directives.mjs'
-import { remarkLeafDirectives } from './src/plugins/remark-leaf-directives.mjs'
-import { remarkReadingTime } from './src/plugins/remark-reading-time.mjs'
 
-const { url: site } = themeConfig.site
-const { imageHostURL } = themeConfig.preload ?? {}
-const imageConfig = imageHostURL
-  ? { image: { domains: [imageHostURL], remotePatterns: [{ protocol: 'https' }] } }
-  : {}
+// Local integrations
+import rehypeAutolinkHeadings from './src/plugins/rehype-auto-link-headings.ts'
+// Shiki
+import {
+  addCollapse,
+  addCopyButton,
+  addLanguage,
+  addTitle,
+  updateStyle
+} from './src/plugins/shiki-custom-transformers.ts'
+import {
+  transformerNotationDiff,
+  transformerNotationHighlight,
+  transformerRemoveNotationEscape
+} from './src/plugins/shiki-official/transformers.ts'
+import config from './src/site.config.ts'
 
+// https://astro.build/config
 export default defineConfig({
-  site,
-  base,
-  trailingSlash: 'always', // Not recommended to change
+  // [Basic]
+  site: 'https://iwewnk0426.github.io',
+  // Deploy to a sub path
+  // https://astro-pure.js.org/docs/setup/deployment#platform-with-base-path
+  // base: '/astro-pure/',
+  trailingSlash: 'never',
+  // root: './my-project-directory',
+  server: { host: true },
+  // https://docs.astro.build/en/guides/prefetch/
   prefetch: {
-    prefetchAll: true,
-    defaultStrategy: 'viewport', // hover, tap, viewport, load
+    // prefetchAll: true,
+    defaultStrategy: 'viewport'
   },
-  ...imageConfig,
-  i18n: {
-    locales: Object.entries(langMap).map(([path, codes]) => ({
-      path,
-      codes: [...codes] as [string, ...string[]],
-    })),
-    defaultLocale,
+
+  // Static output for GitHub Pages.
+  // https://astro-pure.js.org/docs/setup/deployment#static
+  // https://docs.astro.build/en/guides/deploy/github/
+
+  // [Assets]
+  image: {
+    responsiveStyles: true,
+    service: { entrypoint: 'astro/assets/services/sharp' },
+    // domains: ['ghchart.rshah.org'],
+    remotePatterns: [{ protocol: 'https' }]
   },
-  integrations: [
-    UnoCSS({
-      injectReset: true,
-    }),
-    mdx(),
-    partytown({
-      config: {
-        forward: ['dataLayer.push', 'gtag'],
-      },
-    }),
-    sitemap(),
-    Compress({
-      CSS: true,
-      HTML: true,
-      Image: false,
-      JavaScript: true,
-      SVG: false,
-    }),
+  // Enable font preloading and optimization
+  // https://docs.astro.build/en/guides/fonts/
+  fonts: [
+    {
+      provider: fontProviders.fontshare(),
+      name: 'Satoshi',
+      cssVariable: '--font-satoshi',
+      // Default included:
+      // weights: [400],
+      // styles: ["normal", "italics"],
+      // subsets: ["cyrillic-ext", "cyrillic", "greek-ext", "greek", "vietnamese", "latin-ext", "latin"],
+      // fallbacks: ["sans-serif"],
+      styles: ['normal', 'italic'],
+      weights: [400, 500],
+      subsets: ['latin']
+    }
   ],
+
+  // [Markdown]
   markdown: {
-    remarkPlugins: [
-      remarkDirective,
-      remarkMath,
-      remarkContainerDirectives,
-      remarkLeafDirectives,
-      remarkReadingTime,
-    ],
+    remarkPlugins: [remarkMath],
     rehypePlugins: [
-      rehypeKatex,
-      [rehypeMermaid, { strategy: 'pre-mermaid' }],
-      rehypeSlug,
-      rehypeHeadingAnchor,
-      rehypeImageProcessor,
-      rehypeExternalLinks,
-      rehypeCodeCopyButton,
+      [rehypeKatex, {}],
+      rehypeHeadingIds,
+      [
+        rehypeAutolinkHeadings,
+        {
+          behavior: 'append',
+          properties: { className: ['anchor'] },
+          content: { type: 'text', value: '#' }
+        }
+      ]
     ],
-    syntaxHighlight: {
-      type: 'shiki',
-      excludeLangs: ['mermaid'],
-    },
+    // https://docs.astro.build/en/guides/syntax-highlighting/
     shikiConfig: {
-      // Available themes: https://shiki.style/themes
       themes: {
         light: 'github-light',
-        dark: 'github-dark',
+        dark: 'github-dark'
       },
-    },
+      transformers: [
+        // Two copies of @shikijs/types (one under node_modules
+        // and another nested under @astrojs/markdown-remark → shiki).
+        // Official transformers
+        // @ts-ignore this happens due to multiple versions of shiki types
+        transformerNotationDiff(),
+        // @ts-ignore this happens due to multiple versions of shiki types
+        transformerNotationHighlight(),
+        // @ts-ignore this happens due to multiple versions of shiki types
+        transformerRemoveNotationEscape(),
+        // Custom transformers
+        // @ts-ignore this happens due to multiple versions of shiki types
+        updateStyle(),
+        // @ts-ignore this happens due to multiple versions of shiki types
+        addTitle(),
+        // @ts-ignore this happens due to multiple versions of shiki types
+        addLanguage(),
+        // @ts-ignore this happens due to multiple versions of shiki types
+        addCopyButton(2000), // timeout in ms
+        // @ts-ignore this happens due to multiple versions of shiki types
+        addCollapse(15) // max lines that needs to collapse
+      ]
+    }
   },
-  vite: {
-    plugins: [
-      {
-        name: 'prefix-font-urls-with-base',
-        transform(code, id) {
-          if (!id.split('?')[0].endsWith('src/styles/font.css')) {
-            return null
-          }
 
-          return code.replace(/url\(\s*(['"]?)\/fonts\//g, `url($1${base}/fonts/`)
-        },
-      },
-    ],
-    build: {
-      chunkSizeWarningLimit: 600,
-    },
-  },
-  devToolbar: {
-    enabled: false,
-  },
+  // [Integrations]
+  integrations: [
+    // astro-pure will automatically add sitemap, mdx & unocss
+    // sitemap(),
+    // mdx(),
+    AstroPureIntegration(config)
+  ],
+
+  // [Experimental]
+  experimental: {
+    // Allow compatible editors to support intellisense features for content collection entries
+    // https://docs.astro.build/en/reference/experimental-flags/content-intellisense/
+    contentIntellisense: true,
+    // Enable SVGO optimization for SVG assets
+    // https://docs.astro.build/en/reference/experimental-flags/svg-optimization/
+    svgOptimizer: svgoOptimizer(),
+    // Enables pre-rendering your prefetched pages on the client in supported browsers.
+    // https://docs.astro.build/en/reference/experimental-flags/client-prerender/
+    clientPrerender: true,
+    // https://docs.astro.build/en/reference/experimental-flags/queued-rendering/
+    queuedRendering: {
+      enabled: true
+    }
+  }
 })

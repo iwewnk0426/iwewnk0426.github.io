@@ -13,9 +13,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      # Theme lists Playwright as a devDependency, but the site build does not use it.
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
       - name: Checkout your repository using git
         uses: actions/checkout@v7
@@ -23,6 +20,7 @@ jobs:
         uses: withastro/action@v6
         with:
           node-version: 22
+          package-manager: bun
 
   deploy:
     needs: build
