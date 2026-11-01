@@ -4,12 +4,12 @@ content:
     type: collection
     path: src/content/posts
     format: yaml-frontmatter
-    filename: "{primary}.md"
+    filename: '{primary}.md'
     fields:
       - name: title
         type: string
         required: true
-      - name: date
+      - name: published
         type: date
         required: true
       - name: description
