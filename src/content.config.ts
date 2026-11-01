@@ -1,38 +1,44 @@
+import { defineCollection } from 'astro:content'
 import { glob } from 'astro/loaders'
 import { z } from 'astro/zod'
-import { defineCollection } from 'astro:content'
-import { allLocales, themeConfig } from '@/config'
 
-const posts = defineCollection({
-  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/posts' }),
-  schema: z.object({
-    // required
-    title: z.string(),
-    published: z.date(),
-    // optional
-    description: z.string().optional().default(''),
-    updated: z.preprocess(
-      val => val === '' ? undefined : val,
-      z.date().optional(),
-    ),
-    tags: z.array(z.string()).optional().default([]),
-    // Advanced
-    draft: z.boolean().optional().default(false),
-    pin: z.number().int().min(0).max(99).optional().default(0),
-    toc: z.boolean().optional().default(themeConfig.global.toc),
-    lang: z.enum(['', ...allLocales]).optional().default(''),
-    abbrlink: z.string().optional().default('').refine(
-      abbrlink => !abbrlink || /^[a-z0-9\-]*$/.test(abbrlink),
-      { message: 'Abbrlink can only contain lowercase letters, numbers and hyphens' },
-    ),
-  }),
+function removeDupsAndLowerCase(array: string[]) {
+  if (!array.length) return array
+  const lowercaseItems = array.map((str) => str.toLowerCase())
+  const distinctItems = new Set(lowercaseItems)
+  return Array.from(distinctItems)
+}
+
+// Define blog collection
+const blog = defineCollection({
+  // Load Markdown and MDX files in the `src/content/blog/` directory.
+  loader: glob({ base: './src/content/blog', pattern: '**/*.{md,mdx}' }),
+  // Required
+  schema: ({ image }) =>
+    z.object({
+      // Required
+      title: z.string().max(60),
+      description: z.string().max(160),
+      publishDate: z.coerce.date(),
+      // Optional
+      updatedDate: z.coerce.date().optional(),
+      heroImage: z
+        .object({
+          src: image(),
+          alt: z.string().optional(),
+          inferSize: z.boolean().optional(),
+          width: z.number().optional(),
+          height: z.number().optional(),
+          color: z.string().optional()
+        })
+        .optional(),
+      tags: z.array(z.string()).default([]).transform(removeDupsAndLowerCase),
+      language: z.string().optional(),
+      draft: z.boolean().default(false),
+      pin: z.boolean().optional(),
+      // Special fields
+      comment: z.boolean().default(false)
+    })
 })
 
-const about = defineCollection({
-  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/about' }),
-  schema: z.object({
-    lang: z.enum(['', ...allLocales]).optional().default(''),
-  }),
-})
-
-export const collections = { posts, about }
+export const collections = { blog }

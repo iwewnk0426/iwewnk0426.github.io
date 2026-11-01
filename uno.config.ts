@@ -1,75 +1,192 @@
-import type { Preset } from 'unocss'
-import {
-  defineConfig,
-  presetAttributify,
-  presetWind3,
-  transformerDirectives,
-  transformerVariantGroup,
-} from 'unocss'
-import presetTheme from 'unocss-preset-theme'
-import { themeConfig } from './src/config.ts'
+import type { TypographyOptions } from '@unocss/preset-typography'
+import { defineConfig, presetMini, presetTypography, type Rule } from 'unocss'
 
-const { light, dark } = themeConfig.color
+import { integ } from './src/site.config.ts'
+
+const typographyCustom = integ.typography || {}
+
+const fg = 'hsl(var(--foreground) / var(--un-text-opacity, 1))'
+const fgMuted = 'hsl(var(--muted-foreground) / var(--un-text-opacity, 1))'
+const bgMuted = 'hsl(var(--muted) / var(--un-bg-opacity, 1))'
+const border = 'var(--un-default-border-color)'
+const radius = 'var(--radius)'
+
+const typographyConfig: TypographyOptions = {
+  colorScheme: {
+    body: fgMuted,
+    headings: fg,
+    // "lead": [600, 400],
+    links: fg,
+    bold: fg,
+    counters: 'hsl(var(--muted-foreground) / 0.6)',
+    bullets: 'hsl(var(--muted-foreground) / 0.4)',
+    hr: 'hsl(var(--muted-foreground) / 0.4)',
+    quotes: fgMuted,
+    // 'quote-borders': [200, 700],
+    // captions: [500, 400],
+    kbd: fg,
+    // 'kbd-shadows': [900, "white"],
+    code: fg,
+    'pre-code': fgMuted,
+    // 'pre-bg': [800, 'rgb(0 0 0 / 50%)'],
+    'th-borders': border,
+    'td-borders': border
+  },
+  cssExtend: {
+    // Title
+    'h2,h3,h4,h5,h6': {
+      'scroll-margin-top': '4rem'
+    },
+    'h1>a,h2>a,h3>a,h4>a,h5>a,h6>a': {
+      'margin-inline-start': '0.75rem',
+      color: fgMuted,
+      transition: 'opacity 0.2s ease',
+      opacity: '0',
+      'user-select': 'none'
+    },
+    'h1>a:focus,h2>a:focus,h3>a:focus,h4>a:focus,h5>a:focus,h6>a:focus': {
+      opacity: 1
+    },
+    'h1:hover>a,h2:hover>a,h3:hover>a,h4:hover>a,h5:hover>a,h6:hover>a': {
+      opacity: 1
+    },
+    'h1:target>a,h2:target>a,h3:target>a,h4:target>a,h5:target>a,h6:target>a': {
+      opacity: 1
+    },
+    // Links
+    a: {
+      'word-wrap': 'break-word',
+      'word-break': 'break-word',
+      'overflow-wrap': 'anywhere'
+    },
+    // Inline code
+    ':not(pre) > code': {
+      'white-space': 'pre-wrap',
+      'word-break': 'break-all'
+    },
+    ...(typographyCustom.inlineCodeBlockStyle === 'modern' && {
+      ':not(pre) > code': {
+        padding: '0.3em 0.5em',
+        border: `1px solid ${border}`,
+        'border-radius': radius,
+        'background-color': bgMuted
+      },
+      ':not(pre)>code::before': {
+        content: 'none'
+      },
+      ':not(pre)>code::after': {
+        content: 'none'
+      }
+    }),
+    // Blockquote
+    blockquote: {
+      position: 'relative',
+      overflow: 'hidden',
+      'border-width': '1px',
+      'border-inline-start-color': 'inherit',
+      'border-radius': `calc(1.5 * ${radius})`,
+      'padding-inline': '1.6rem',
+      'box-shadow': `0 5px 0 ${bgMuted}`,
+      ...(typographyCustom.blockquoteStyle === 'normal' && { 'font-style': 'normal' })
+    },
+    'blockquote::after': {
+      color: fgMuted,
+      position: 'absolute',
+      content: '"”"',
+      top: '2.6rem',
+      right: '-1.4rem',
+      'font-size': '10rem',
+      'font-family':
+        '"Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande", "Lucida Sans", Arial, sans-serif',
+      transform: 'rotate(-15deg)',
+      opacity: '0.1'
+    },
+    // Table
+    table: { display: 'block', 'font-size': '.875em', 'overflow-x': 'auto' },
+    'table tr': { 'border-bottom-width': '1px' },
+    'tbody tr:last-child': { 'border-bottom-width': '0' },
+    'thead th': { 'font-weight': '500', color: fg },
+    'td, th': { border: 'inherit', 'text-align': 'start', padding: '0.57em' },
+    'thead th:first-child,thead th:first-child,tbody td:first-child,tfoot td:first-child': {
+      'padding-inline-start': '0'
+    },
+    // List
+    'ol, ul': { 'padding-inline-start': '1.625em' },
+    'ol>li, ul>li': { 'padding-inline-start': '.375em' },
+    li: { 'margin-top': '.5em', 'margin-bottom': '.5em' },
+    // Others
+    img: { 'border-radius': radius, margin: '0 auto' },
+    kbd: {
+      'border-color': border,
+      'box-shadow': '0 0 0 1px hsl(var(--card) / 1), 0 3px hsl(var(--card) / 1)'
+    },
+    'sup>a': { 'scroll-margin-top': '4rem' }
+  }
+}
+
+const themeColors = {
+  // Primary
+  primary: 'hsl(var(--primary) / <alpha-value>)',
+  // Foreground & background
+  foreground: 'hsl(var(--foreground) / <alpha-value>)',
+  background: 'hsl(var(--background) / <alpha-value>)',
+  muted: {
+    DEFAULT: 'hsl(var(--muted) / <alpha-value>)',
+    foreground: 'hsl(var(--muted-foreground) / <alpha-value>)'
+  },
+  card: 'hsl(var(--card) / <alpha-value>)',
+
+  // Basic
+  border: 'hsl(var(--border) / <alpha-value>)',
+  input: 'hsl(var(--input) / <alpha-value>)',
+  ring: 'hsl(var(--ring) / <alpha-value>)'
+}
+
+const rules: Rule<object>[] = [
+  // Fix unocss presetMini
+  [
+    'sr-only',
+    {
+      position: 'absolute',
+      width: '1px',
+      height: '1px',
+      padding: '0',
+      margin: '-1px',
+      overflow: 'hidden',
+      clip: 'rect(0,0,0,0)',
+      'white-space': 'nowrap',
+      'border-width': '0'
+    }
+  ],
+  ['object-cover', { 'object-fit': 'cover' }],
+  ['bg-cover', { 'background-size': 'cover' }],
+  [
+    /^line-clamp-(\d+)$/,
+    ([, d]) => ({
+      overflow: 'hidden',
+      display: '-webkit-box',
+      '-webkit-box-orient': 'vertical',
+      '-webkit-line-clamp': d
+    })
+  ]
+]
 
 export default defineConfig({
   presets: [
-    presetWind3(),
-    presetAttributify(),
-    presetTheme({
-      theme: {
-        dark: {
-          colors: {
-            ...dark,
-            note: 'oklch(70.7% 0.165 254.624 / 0.8)', // blue-400
-            tip: 'oklch(76.5% 0.177 163.223 / 0.8)', // emerald-400
-            important: 'oklch(71.4% 0.203 305.504 / 0.8)', // purple-400
-            warning: 'oklch(82.8% 0.189 84.429 / 0.8)', // amber-400
-            caution: 'oklch(70.4% 0.191 22.216 / 0.8)', // red-400
-          },
-        },
-      },
-    }) as Preset<object>,
+    presetMini(), // required
+    presetTypography(typographyConfig)
   ],
+  rules,
   theme: {
-    colors: {
-      ...light,
-      note: 'oklch(48.8% 0.243 264.376 / 0.8)', // blue-700
-      tip: 'oklch(50.8% 0.118 165.612 / 0.8)', // emerald-700
-      important: 'oklch(49.6% 0.265 301.924 / 0.8)', // purple-700
-      warning: 'oklch(55.5% 0.163 48.998 / 0.8)', // amber-700
-      caution: 'oklch(50.5% 0.213 27.518 / 0.8)', // red-700
-    },
-    fontFamily: {
-      title: ['Snell-Black', 'EarlySummer-Subset', 'EarlySummer', 'ui-serif', 'Georgia', 'Cambria', 'Times New Roman', 'Times', 'serif'],
-      navbar: ['STIX-Italic', 'EarlySummer-Subset', 'EarlySummer', 'ui-serif', 'Georgia', 'Cambria', 'Times New Roman', 'Times', 'serif'],
-      time: ['Snell-Bold', 'ui-serif', 'Georgia', 'Cambria', 'Times New Roman', 'Times', 'serif'],
-      serif: ['STIX', 'EarlySummer', 'ui-serif', 'Georgia', 'Cambria', 'Times New Roman', 'Times', 'serif'],
-    },
+    colors: themeColors
   },
-  rules: [
-    ['scrollbar-hidden', {
-      'scrollbar-width': 'none',
-      '-ms-overflow-style': 'none',
-    }],
-  ],
-  shortcuts: {
-    'uno-desktop-column': 'fixed right-[max(5rem,calc(50vw-35rem))] w-14rem',
-    'uno-decorative-line': 'mb-4.5 h-0.25 w-10 bg-secondary/25 lg:(mb-6 w-11)',
-    'uno-round-border': 'border border-secondary/5 rounded border-solid',
-  },
-  variants: [
-    (matcher) => {
-      if (!matcher.startsWith('cjk:')) {
-        return matcher
-      }
-      return {
-        matcher: matcher.slice(4),
-        selector: s => `${s}:is(:lang(zh), :lang(ja), :lang(ko))`,
-      }
-    },
-  ],
-  transformers: [
-    transformerDirectives(),
-    transformerVariantGroup(),
-  ],
+  // https://unocss.dev/guide/extracting#limitations
+  safelist: [
+    // TOC
+    'rounded-t-2xl',
+    'rounded-b-2xl',
+    // Typography
+    'text-base',
+    'prose'
+  ]
 })

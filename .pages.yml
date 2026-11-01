@@ -2,18 +2,18 @@ content:
   - name: posts
     label: Posts
     type: collection
-    path: src/content/posts
+    path: src/content/blog
     format: yaml-frontmatter
     filename: '{primary}.md'
     fields:
       - name: title
         type: string
         required: true
-      - name: published
+      - name: publishDate
         type: date
         required: true
       - name: description
         type: string
-        required: false
+        required: true
       - name: body
         type: rich-text

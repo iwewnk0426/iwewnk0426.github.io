@@ -1,20 +1,19 @@
 import type { APIRoute } from 'astro'
-import { base } from '@/config'
 
-export const GET: APIRoute = ({ site }) => {
-  const sitemapURL = new URL('sitemap-index.xml', site)
+const robotsTxt = `
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: Claude-Web
 
-  const robotsTxt = [
-    'User-agent: *',
-    'Allow: /',
-    `Disallow: ${base}/~partytown/`,
-    '',
-    `Sitemap: ${sitemapURL.href}`,
-  ].join('\n')
+User-agent: *
+Allow: /
 
-  return new Response(robotsTxt, {
+Sitemap: ${new URL('sitemap-index.xml', import.meta.env.SITE).href}
+`.trim()
+
+export const GET: APIRoute = () =>
+  new Response(robotsTxt, {
     headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-    },
+      'Content-Type': 'text/plain; charset=utf-8'
+    }
   })
-}
