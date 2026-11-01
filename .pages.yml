@@ -1,0 +1,19 @@
+content:
+  - name: posts
+    label: Posts
+    type: collection
+    path: src/content/posts
+    format: yaml-frontmatter
+    filename: "{primary}.md"
+    fields:
+      - name: title
+        type: string
+        required: true
+      - name: date
+        type: date
+        required: true
+      - name: description
+        type: string
+        required: false
+      - name: body
+        type: rich-text
