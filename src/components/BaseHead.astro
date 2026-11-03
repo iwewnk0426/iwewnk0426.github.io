@@ -5,9 +5,9 @@ import { prod } from 'astro-pure/server'
 import type { SiteMeta } from 'astro-pure/types'
 import config from 'virtual:config'
 
-type Props = SiteMeta
+type Props = SiteMeta & { noindex?: boolean }
 
-const { articleDate, description, ogImage, title } = Astro.props
+const { articleDate, description, ogImage, title, noindex = false } = Astro.props
 
 const siteTitle = `${title} ${config.titleDelimiter} ${config.title}`
 const canonicalURL = new URL(Astro.url.pathname, Astro.site)
@@ -15,6 +15,7 @@ const socialImageURL = new URL(ogImage ? ogImage : config.socialCard, Astro.url)
 ---
 
 <meta charset='utf-8' />
+{noindex && <meta name='robots' content='noindex, nofollow' />}
 <meta
   content='width=device-width, initial-scale=1.0, shrink-to-fit=no, viewport-fit=cover'
   name='viewport'

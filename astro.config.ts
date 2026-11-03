@@ -1,4 +1,8 @@
+import { access, rename, rm } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
+import type { AstroIntegration } from 'astro'
 import { rehypeHeadingIds } from '@astrojs/markdown-remark'
+import sitemap from '@astrojs/sitemap'
 import AstroPureIntegration from 'astro-pure'
 import { defineConfig, fontProviders, svgoOptimizer } from 'astro/config'
 import rehypeKatex from 'rehype-katex'
@@ -20,6 +24,46 @@ import {
   transformerRemoveNotationEscape
 } from './src/plugins/shiki-official/transformers.ts'
 import config from './src/site.config.ts'
+
+// Pagefind indexes every HTML file under dist. Move /admin aside while that
+// index is built, then put the page back so it still ships.
+function excludeAdminFromPagefind(phase: 'hide' | 'restore'): AstroIntegration {
+  return {
+    name: phase === 'hide' ? 'admin-hide-from-pagefind' : 'admin-restore-after-pagefind',
+    hooks: {
+      'astro:build:done': async ({ dir }) => {
+        const adminDir = fileURLToPath(new URL('admin/', dir))
+        const stashDir = fileURLToPath(new URL('../.admin-pagefind-stash/', dir))
+        if (phase === 'hide') {
+          try {
+            await access(adminDir)
+          } catch {
+            return
+          }
+          await rm(stashDir, { recursive: true, force: true })
+          await rename(adminDir, stashDir)
+          return
+        }
+        try {
+          await access(stashDir)
+        } catch {
+          return
+        }
+        await rm(adminDir, { recursive: true, force: true })
+        await rename(stashDir, adminDir)
+      }
+    }
+  }
+}
+
+function isAdminPath(page: string): boolean {
+  try {
+    const pathname = new URL(page).pathname
+    return pathname === '/admin' || pathname === '/admin/'
+  } catch {
+    return false
+  }
+}
 
 // https://astro.build/config
 export default defineConfig({
@@ -114,10 +158,15 @@ export default defineConfig({
 
   // [Integrations]
   integrations: [
-    // astro-pure will automatically add sitemap, mdx & unocss
-    // sitemap(),
-    // mdx(),
-    AstroPureIntegration(config)
+    // Run before astro-pure's Pagefind hook. Sitemap is registered here so
+    // astro-pure does not add a second one, and /admin can be filtered out.
+    excludeAdminFromPagefind('hide'),
+    sitemap({
+      filter: (page) => !isAdminPath(page)
+    }),
+    // astro-pure still adds mdx & unocss. It skips sitemap because one is already configured.
+    AstroPureIntegration(config),
+    excludeAdminFromPagefind('restore')
   ],
 
   // [Experimental]

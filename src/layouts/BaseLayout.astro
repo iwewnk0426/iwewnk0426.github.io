@@ -12,18 +12,21 @@ import '@/assets/styles/app.css'
 interface Props {
   meta: SiteMeta
   highlightColor?: string
+  /** Omit this page from indexes. Used only by /admin. */
+  noindex?: boolean
 }
 
 const {
   meta: { articleDate, description = config.description, ogImage, title },
   highlightColor,
+  noindex = false,
   ...props
 } = Astro.props
 ---
 
-<html lang={config.locale.lang}>
+<html lang={config.locale.lang} {...noindex ? { 'data-pagefind-ignore': 'all' } : {}}>
   <head>
-    <BaseHead {articleDate} {description} {ogImage} {title} />
+    <BaseHead {articleDate} {description} {ogImage} {title} noindex={noindex} />
     <ThemeProvider />
   </head>
 

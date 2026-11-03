@@ -33,6 +33,7 @@ node_modules/
 .env.production
 
 ### Custom ###
+.admin-pagefind-stash/
 .DS_Store
 old_blog
 ignore.*
