@@ -1,0 +1,268 @@
+---
+import PageLayout from '@/layouts/BaseLayout.astro'
+---
+
+<PageLayout
+  meta={{ title: '文章管理', description: '仅供站长登录后管理文章。' }}
+  noindex
+  highlightColor='#659EB9'
+>
+  <main id='admin' class='mx-auto w-full max-w-3xl py-6'>
+    <div id='session-bar' class='mb-4 flex justify-end' hidden>
+      <button id='logout' class='admin-btn' type='button'>退出登录</button>
+    </div>
+
+    <section id='view-login'>
+      <h1 class='text-2xl font-medium'>文章管理</h1>
+      <p class='mt-2 text-sm text-muted-foreground'>
+        只有 Knox（GitHub 用户
+        iwewnk0426）能登录。没有令牌时只能看到这个页面，不能读、改或删除文章。
+      </p>
+
+      <h2 class='mt-6 text-lg font-medium'>创建令牌</h2>
+      <ol class='mt-2 list-decimal space-y-1 ps-5 text-sm text-muted-foreground leading-6'>
+        <li>
+          打开
+          <a
+            href='https://github.com/settings/personal-access-tokens/new'
+            target='_blank'
+            rel='noopener noreferrer'
+          >
+            新建细粒度个人访问令牌
+          </a>
+          。
+        </li>
+        <li>Token name 可填 <code>knox-blog-admin</code>。</li>
+        <li>Expiration 建议选 30 天或 90 天，到期后再生成一个。</li>
+        <li>Resource owner 选择 <code>iwewnk0426</code>。</li>
+        <li>
+          Repository access 选择 Only select repositories，并且只添加
+          <code>iwewnk0426/iwewnk0426.github.io</code>。
+        </li>
+        <li>
+          Permissions 里展开 Repository permissions，把 Contents 设为 Read and
+          write。其他权限不用开。
+        </li>
+        <li>
+          点击 Generate token。令牌只显示一次，一般以 <code>github_pat_</code> 开头，粘贴到下面。
+        </li>
+      </ol>
+      <p class='mt-2 text-sm text-muted-foreground'>
+        令牌只存在这台浏览器的 localStorage 里，请求只发往
+        api.github.com，不会写进网站仓库。用完请点退出登录，尤其是公用电脑。
+      </p>
+
+      <form id='login-form' class='mt-6' method='post' action='#admin' novalidate>
+        <label class='admin-label' for='token'>访问令牌</label>
+        <input
+          id='token'
+          class='admin-input'
+          type='password'
+          autocomplete='off'
+          autocapitalize='off'
+          autocorrect='off'
+          spellcheck='false'
+          required
+        />
+        <div class='admin-actions mt-4'>
+          <button id='login-submit' class='admin-btn admin-btn-primary' type='submit'>登录</button>
+        </div>
+        <p id='login-error' class='admin-error' role='alert'></p>
+      </form>
+    </section>
+
+    <section id='view-list' hidden>
+      <div class='flex flex-wrap items-center justify-between gap-3'>
+        <h1 class='text-2xl font-medium'>文章</h1>
+        <div class='admin-actions'>
+          <button id='new-post' class='admin-btn admin-btn-primary' type='button'>新建文章</button>
+          <button id='reload-list' class='admin-btn' type='button'>刷新</button>
+        </div>
+      </div>
+      <p id='list-status' class='admin-error' role='status'></p>
+      <p id='list-empty' class='mt-6 text-sm text-muted-foreground' hidden>还没有文章。</p>
+      <ul id='post-list' class='mt-2'></ul>
+    </section>
+
+    <section id='view-editor' hidden>
+      <div class='flex flex-wrap items-center justify-between gap-3'>
+        <h1 id='editor-heading' class='text-2xl font-medium'>新建文章</h1>
+        <button id='back-btn' class='admin-btn' type='button'>返回</button>
+      </div>
+      <form id='editor-form' autocomplete='off' novalidate>
+        <label class='admin-label' for='field-title'>标题</label>
+        <input id='field-title' class='admin-input' type='text' maxlength='60' required />
+        <p class='mt-1 text-sm text-muted-foreground'>最多 60 个字符。</p>
+
+        <label class='admin-label' for='field-description'>简介</label>
+        <textarea
+          id='field-description'
+          class='admin-input admin-short'
+          maxlength='160'
+          rows='3'
+          required></textarea>
+        <p class='mt-1 text-sm text-muted-foreground'>最多 160 个字符，一行。</p>
+
+        <label class='admin-label' for='field-date'>日期</label>
+        <input id='field-date' class='admin-input' type='date' required />
+        <p class='mt-1 text-sm text-muted-foreground'>默认是今天（Asia/Shanghai）。</p>
+
+        <div id='slug-wrap'>
+          <label class='admin-label' for='field-slug'>文件名</label>
+          <input
+            id='field-slug'
+            class='admin-input'
+            type='text'
+            autocapitalize='off'
+            autocorrect='off'
+            spellcheck='false'
+            inputmode='text'
+            pattern='[a-z0-9]+(-[a-z0-9]+)*'
+          />
+          <p class='mt-1 text-sm text-muted-foreground'>
+            只用小写字母、数字和连字符，保存为
+            src/content/blog/文件名.md。不能覆盖已有文件，已有文章也不能在这里改名。
+          </p>
+        </div>
+        <p id='slug-locked' class='mt-4 text-sm text-muted-foreground' hidden></p>
+
+        <label class='admin-label' for='field-body'>正文</label>
+        <textarea
+          id='field-body'
+          class='admin-input'
+          rows='18'
+          spellcheck='false'
+          autocapitalize='off'
+          autocorrect='off'></textarea>
+        <p class='mt-1 text-sm text-muted-foreground'>
+          支持 Markdown 和 LaTeX（$...$ 与 $$...$$），内容会原样保存。这一页不做实时预览，避免再打包
+          Markdown 和 KaTeX。
+        </p>
+
+        <div class='admin-actions mt-4'>
+          <button id='save-btn' class='admin-btn admin-btn-primary' type='submit'>保存</button>
+          <button id='delete-btn' class='admin-btn' type='button' hidden>删除</button>
+        </div>
+        <p id='editor-status' class='admin-error' role='status'></p>
+      </form>
+    </section>
+
+    <template id='post-row'>
+      <li class='post-row'>
+        <div class='min-w-0'>
+          <p class='font-medium break-words' data-title></p>
+          <p class='text-sm text-muted-foreground break-words' data-meta></p>
+        </div>
+        <button class='admin-btn' type='button' data-edit>编辑</button>
+      </li>
+    </template>
+  </main>
+</PageLayout>
+
+<style is:global>
+  #admin .admin-label {
+    display: block;
+    margin-top: 1rem;
+    font-size: 0.95rem;
+  }
+  #admin .admin-input {
+    margin-top: 0.25rem;
+    width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    padding: 0.55rem 0.75rem;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  #admin textarea.admin-input {
+    min-height: 50vh;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  #admin textarea.admin-short {
+    min-height: 0;
+  }
+  #admin .admin-input:focus {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 1px;
+  }
+  #admin .admin-btn {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--muted));
+    color: hsl(var(--foreground));
+    padding: 0.5rem 1rem;
+    font-size: 0.95rem;
+  }
+  #admin .admin-btn-primary {
+    background: hsl(var(--foreground));
+    color: hsl(var(--background));
+    border-color: transparent;
+  }
+  #admin .admin-btn:disabled {
+    opacity: 0.55;
+  }
+  #admin .admin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  #admin .admin-actions .admin-btn {
+    flex: 1 1 8rem;
+  }
+  #admin .admin-error:not(:empty) {
+    margin-top: 0.75rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    background: hsl(var(--muted));
+    color: hsl(var(--foreground));
+  }
+  #admin .post-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+    padding: 0.75rem 0;
+  }
+  #admin {
+    overflow-wrap: anywhere;
+  }
+  #admin a,
+  #admin code,
+  #admin #editor-status a {
+    overflow-wrap: anywhere;
+  }
+  #admin a {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+  #admin #editor-status a {
+    text-decoration: underline;
+  }
+  #admin [hidden] {
+    display: none !important;
+  }
+  @media (min-width: 640px) {
+    #admin .post-row {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #admin .admin-actions .admin-btn {
+      flex: 0 0 auto;
+    }
+  }
+</style>
+
+<script>
+  import { startAdmin } from '../../scripts/admin.ts'
+
+  startAdmin()
+</script>
