@@ -1,0 +1,56 @@
+---
+import type { GetStaticPaths } from 'astro'
+import type { CollectionEntry } from 'astro:content'
+
+import { PostPreview } from 'astro-pure/components/pages'
+import { getBlogCollection, sortMDByDate } from 'astro-pure/server'
+import { Button } from 'astro-pure/user'
+import PageLayout from '@/layouts/BaseLayout.astro'
+
+export const prerender = true
+
+export const getStaticPaths = (async () => {
+  const allPosts = sortMDByDate(await getBlogCollection())
+  const categories = [
+    ...new Set(
+      allPosts
+        .map((post) => post.data.category)
+        .filter((category): category is string => Boolean(category))
+    )
+  ]
+
+  return categories.map((category) => ({
+    params: { category },
+    props: {
+      posts: allPosts.filter((post) => post.data.category === category)
+    }
+  }))
+}) satisfies GetStaticPaths
+
+interface Props {
+  posts: CollectionEntry<'blog'>[]
+}
+
+const { posts } = Astro.props
+const { category } = Astro.params
+
+const meta = {
+  description: `分类：${category}`,
+  title: category ?? '分类'
+}
+---
+
+<PageLayout {meta}>
+  <Button title='Back' href='/categories' variant='back' />
+  <main class='mt-6 lg:mt-10'>
+    <div id='content-header' class='animate'>
+      <h1 class='mb-6 text-3xl font-medium'>{category}</h1>
+    </div>
+
+    <section id='content' class='animate' aria-label='Blog post list'>
+      <ul class='flex flex-col gap-y-4 text-start'>
+        {posts.map((post) => <PostPreview {post} detailed />)}
+      </ul>
+    </section>
+  </main>
+</PageLayout>

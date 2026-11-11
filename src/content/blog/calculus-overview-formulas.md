@@ -2,6 +2,7 @@
 title: 微积分概述和常用公式表
 description: 微积分的核心概念,以及常用的导数、积分和级数公式表。
 publishDate: 2026-11-01
+category: 数学
 ---
 
 ## 微积分在讲什么
