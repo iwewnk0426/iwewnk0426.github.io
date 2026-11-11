@@ -6,9 +6,10 @@ import type { CollectionEntry } from 'astro:content'
 import 'katex/dist/katex.min.css'
 
 import { MediumZoom } from 'astro-pure/advanced'
-import { ArticleBottom, Copyright, Hero, TOC } from 'astro-pure/components/pages'
+import { ArticleBottom, Copyright, Hero } from 'astro-pure/components/pages'
 import { Button } from 'astro-pure/user'
 import PageLayout from '@/layouts/ContentLayout.astro'
+import Toc from '@/components/Toc.astro'
 import { Comment, PageInfo } from '@/components/waline'
 import config from 'virtual:config'
 
@@ -19,12 +20,8 @@ interface Props {
   remarkPluginFrontmatter: Record<string, unknown>
 }
 
-const {
-  post: { id, data },
-  posts,
-  headings,
-  remarkPluginFrontmatter
-} = Astro.props
+const { post, posts, headings, remarkPluginFrontmatter } = Astro.props
+const { id, data } = post
 
 const {
   description,
@@ -52,7 +49,7 @@ const showComment = !isDraft && enableComment && config.integ.waline.enable
   highlightColor={primaryColor}
   back='/blog'
 >
-  {!!headings.length && <TOC {headings} slot='sidebar' />}
+  {!!headings.length && <Toc {headings} source={post.body} slot='sidebar' />}
 
   <Hero {data} {remarkPluginFrontmatter} slot='header'>
     <Fragment slot='description'>

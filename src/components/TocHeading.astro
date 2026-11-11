@@ -1,0 +1,47 @@
+---
+import type { MarkdownHeading } from 'astro'
+
+import { cn } from 'astro-pure/utils'
+
+interface TocHeadingItem extends MarkdownHeading {
+  subheadings: TocHeadingItem[]
+}
+
+interface Props {
+  heading: TocHeadingItem
+}
+
+const {
+  heading: { depth, slug, subheadings, text }
+} = Astro.props
+const label = text
+  .replace(/<[^>]+>/g, '')
+  .replace(/\s+/g, ' ')
+  .trim()
+---
+
+<li>
+  <div class='relative'>
+    <span
+      class='absolute top-[5%] w-[2px] rounded transition-colors duration-300 [&.highlight-bg]:bg-primary [&.is-read]:bg-border'
+    ></span>
+    <a
+      aria-label={`Scroll to section: ${label}`}
+      class={cn(
+        'toc-item line-clamp-2 px-3 py-1 ms-2 text-foreground/75 transition-all hover:text-foreground [&.highlight]:font-medium [&.highlight]:text-primary [&.highlight-bg-translucent]:bg-muted',
+        depth > 2 && 'ps-7'
+      )}
+      href={`#${slug}`}
+      set:html={text}
+    />
+  </div>
+  {
+    !!subheadings.length && (
+      <ul>
+        {subheadings.map((subheading) => (
+          <Astro.self heading={subheading} />
+        ))}
+      </ul>
+    )
+  }
+</li>
