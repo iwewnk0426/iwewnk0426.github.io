@@ -2,6 +2,7 @@
 title: 微积分笔记:从函数、极限到导数与积分
 description: 我的手写微积分笔记整理,涵盖反函数、对数、极限、连续、导数及其应用、积分及其应用。
 publishDate: 2026-11-10
+updatedDate: 2026-11-11
 category: 数学
 ---
 
@@ -811,6 +812,262 @@ $$
 =-x\cos x+\sin x+C
 $$
 
+### 有理函数的积分与部分分式法
+
+部分分式法
+
+有理函数 $f(x)=\dfrac{P(x)}{Q(x)}$  记 $P$ 次数为 $\deg(P)$
+
+如果 $\deg(P)<\deg(Q)$ 则称 $f$ 为真分式
+
+如果 $\deg(P)\ge\deg(Q)$ 则称 $f$ 为假分式
+
+遇见这种情况先要用长除法,得到余式 $R(x)$ 满足 $\deg(R)<\deg(Q)$
+
+$$
+f(x)=\frac{P(x)}{Q(x)}=S(x)+\frac{R(x)}{Q(x)}\qquad\text{\textcircled{1}}
+$$
+
+有时只需要这样处理就可以了
+
+e.g. $\displaystyle\int\frac{x^3+x}{x-1}\,dx$
+
+$$
+\int\frac{x^3+x}{x-1}\,dx=\int\left(x^2+x+2+\frac{2}{x-1}\right)dx
+$$
+
+$$
+=\frac{x^3}{3}+\frac{x^2}{2}+2x+2\ln\lvert x-1\rvert+C
+$$
+
+第二步将 ① 中的 $Q(x)$ 因式分解
+
+第三步是将有理函数的真分式部分 $R(x)/Q(x)$ 表示为
+
+$$
+\frac{A}{(ax+b)^i}\quad\text{或}\quad\frac{Ax+B}{(ax^2+bx+c)^j}
+$$
+
+有四种情况
+
+#### 情况 I:分母是线性因式的乘积,其中没有重因式
+
+在这种情况下 存在常数 $A_1,A_2,\cdots,A_k$
+
+使得
+
+$$
+\frac{R(x)}{Q(x)}=\frac{A_1}{a_1x+b_1}+\frac{A_2}{a_2x+b_2}+\cdots+\frac{A_k}{a_kx+b_k}
+$$
+
+e.g. 求 $\displaystyle\int\frac{x^2+2x-1}{2x^3+3x^2-2x}\,dx$
+
+因为此为真分式,无需长除法
+
+$$
+2x^3+3x^2-2x=x(2x^2+3x-2)=x(2x-1)(x+2)
+$$
+
+函数可以分解为如下形式
+
+$$
+\frac{x^2+2x-1}{x(2x-1)(x+2)}=\frac{A}{x}+\frac{B}{2x-1}+\frac{C}{x+2}
+$$
+
+将等式两边同乘最小公倍数 $x(2x-1)(x+2)$
+
+得
+
+$$
+x^2+2x-1=A(2x-1)(x+2)+Bx(x+2)+Cx(2x-1)
+$$
+
+展开,整理成标准形式
+
+得
+
+$$
+x^2+2x-1=(2A+B+2C)x^2+(3A+2B-C)x-2A
+$$
+
+多项式相等,得系数相等
+
+得
+
+$$
+\begin{aligned}
+2A+B+2C&=1\\
+3A+2B-C&=2\\
+-2A&=-1
+\end{aligned}
+$$
+
+解得 $A=\dfrac{1}{2}$  $B=\dfrac{1}{5}$,$C=-\dfrac{1}{10}$
+
+$$
+\int\frac{x^2+2x-1}{2x^3+3x^2-2x}\,dx=\int\left(\frac{1}{2}\times\frac{1}{x}+\frac{1}{5}\times\frac{1}{2x-1}-\frac{1}{10}\times\frac{1}{x+2}\right)dx
+$$
+
+$$
+=\frac{1}{2}\ln\lvert x\rvert+\frac{1}{10}\ln\lvert 2x-1\rvert-\frac{1}{10}\ln\lvert x+2\rvert+K
+$$
+
+在对中间的项积分时,使用了换元 $u=2x-1$
+
+同时有公式
+
+$$
+\int\frac{dx}{x^2-a^2}=\frac{1}{2a}\ln\left\lvert\frac{x-a}{x+a}\right\rvert+C
+$$
+
+#### 情况 II:$Q(x)$ 是线性因式的乘积,其中有重因式
+
+假设 $Q(x)$ 的因式分解中包含 $(a_1x+b_1)^r$
+
+那么用
+
+$$
+\frac{A_1}{a_1x+b_1}+\frac{A_2}{(a_1x+b_1)^2}+\cdots+\frac{A_r}{(a_1x+b_1)^r}
+$$
+
+e.g. 求 $\displaystyle\int\frac{x^4-2x^2+4x+1}{x^3-x^2-x+1}\,dx$
+
+长除法
+
+得
+
+$$
+\frac{x^4-2x^2+4x+1}{x^3-x^2-x+1}=x+1+\frac{4x}{x^3-x^2-x+1}
+$$
+
+因式分解 $Q(x)$,因为 $Q(1)=0$,所以 $(x-1)$ 是一个因式
+
+$$
+x^3-x^2-x+1=(x-1)(x^2-1)=(x-1)(x-1)(x+1)
+$$
+
+$$
+=(x-1)^2(x+1)
+$$
+
+得
+
+$$
+\frac{4x}{x^3-x^2-x+1}=\frac{A}{x-1}+\frac{B}{(x-1)^2}+\frac{C}{x+1}
+$$
+
+以下省略
+
+$$
+\int\frac{x^4-2x^2+4x+1}{x^3-x^2-x+1}\,dx=\int\left[x+1+\frac{1}{x-1}+\frac{2}{(x-1)^2}-\frac{1}{x+1}\right]dx
+$$
+
+$$
+=\frac{x^2}{2}+x-\frac{2}{x-1}+\ln\left\lvert\frac{x-1}{x+1}\right\rvert+K
+$$
+
+#### 情况 III:$Q(x)$ 含不可约二次因式,其中没有重因式
+
+如果 $Q(x)$ 包含因式 $ax^2+bx+c$,$R(x)/Q(x)$ 的表达式有一项为
+
+$$
+\frac{Ax+B}{ax^2+bx+c}
+$$
+
+e.g.
+
+$$
+f(x)=x/[(x-2)(x^2+1)(x^2+4)]
+$$
+
+可分解为
+
+$$
+\frac{x}{(x-2)(x^2+1)(x^2+4)}=\frac{A}{x-2}+\frac{Bx+C}{x^2+1}+\frac{Dx+E}{x^2+4}
+$$
+
+我们可以通过
+
+$$
+\int\frac{dx}{x^2+a^2}=\frac{1}{a}\tan^{-1}\left(\frac{x}{a}\right)+C
+$$
+
+和配方来求积分
+
+配方 e.g.
+
+求 $\displaystyle\int\frac{x-1}{4x^2-4x+3}\,dx$
+
+由于 $b^2-4ac<0$ 无法因式分解
+
+配方得 $4x^2-4x+3=(2x-1)^2+2$
+
+令 $u=2x-1$,$du=2\,dx$,$x=\dfrac{1}{2}(u+1)$
+
+以下省略
+
+#### 情况 IV:$Q(x)$ 包含不可约二次因式,其中有重因式
+
+如果 $Q(x)$ 包含因式 $(ax^2+bx+c)^r$
+
+我们用
+
+$$
+\frac{A_1x+B_1}{ax^2+bx+c}+\frac{A_2x+B_2}{(ax^2+bx+c)^2}+\cdots+\frac{A_rx+B_r}{(ax^2+bx+c)^r}
+$$
+
+之后通过换元或配方
+
+以下省略
+
+### 积分策略
+
+#### 补充积分
+
+$$
+\int\frac{dx}{x^2+a^2}=\frac{1}{a}\tan^{-1}\left(\frac{x}{a}\right)+C
+$$
+
+$$
+\int\frac{dx}{\sqrt{x^2\pm a^2}}=\ln\left\lvert x+\sqrt{x^2\pm a^2}\right\rvert+C
+$$
+
+$$
+\int\frac{dx}{\sqrt{a^2-x^2}}=\sin^{-1}\left(\frac{x}{a}\right)+C
+$$
+
+$$
+\int\frac{dx}{x^2-a^2}=\frac{1}{2a}\ln\left\lvert\frac{x-a}{x+a}\right\rvert+C
+$$
+
+#### 步骤
+
+1. 尽可能化简积分
+
+2. 寻找明显的换元
+
+   如 $\displaystyle\int\frac{x}{x^2-1}\,dx$
+
+3. 按照被积函数形式分类
+
+   (a) 有理函数 考虑部分分式法
+
+   (b) 分部积分,如果 $f(x)$ 是 $x$ 的幂(或多项式)与超越函数的乘积,考虑分部积分法
+
+   (c) 根式 考虑特定类型的换元
+
+   (i) 如果出现 $\sqrt{x^2\pm a^2}$ 等使用上述补充积分换元
+
+   (ii) 如果出现 $\sqrt[n]{ax+b}$,可以令 $u=\sqrt[n]{ax+b}$,更一般的,它有时也适用于 $\sqrt[n]{g(x)}$
+
+4. 再次尝试
+
+   (a) 尝试换元法
+
+   (b) 尝试分部积分法
+
+   (c) 将被积函数变形
+
 ## 八、积分的应用
 
 ### 曲线间的面积
@@ -870,3 +1127,11 @@ $$
 ![笔记原图 第 9 页](/images/calculus-handwritten-notes/notes-9.jpg)
 
 ![笔记原图 第 10 页](/images/calculus-handwritten-notes/notes-10.jpg)
+
+![笔记原图 第 11 页](/images/calculus-handwritten-notes/notes-11.jpg)
+
+![笔记原图 第 12 页](/images/calculus-handwritten-notes/notes-12.jpg)
+
+![笔记原图 第 13 页](/images/calculus-handwritten-notes/notes-13.jpg)
+
+![笔记原图 第 14 页](/images/calculus-handwritten-notes/notes-14.jpg)
