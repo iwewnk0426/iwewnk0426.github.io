@@ -1,10 +1,10 @@
 ---
 title: 微积分笔记:从函数、极限到导数与积分
-description: 我的手写微积分笔记整理,涵盖反函数、对数、极限、连续、导数及其应用、积分及其应用。
+description: 我的手写微积分笔记整理,涵盖反函数、对数、极限、连续、导数及其应用、积分及其应用、反常积分与微分方程。
 publishDate: 2026-11-10
-updatedDate: 2026-11-11
+updatedDate: 2026-11-12
 category: 微积分
-tags: [数学, 笔记, 例题, 公式, 极限, 导数, 积分]
+tags: [数学, 笔记, 例题, 公式, 极限, 导数, 积分, 微分方程]
 ---
 
 ## 一、函数
@@ -1069,6 +1069,150 @@ $$
 
    (c) 将被积函数变形
 
+### 积分的近似
+
+#### 中点法则
+
+$$
+\int_a^b f(x)\,dx\approx M_n=\Delta x\left[f(\bar{x}_1)+f(\bar{x}_2)+\cdots+f(\bar{x}_n)\right]
+$$
+
+其中 $\Delta x=\dfrac{b-a}{n}$,$\bar{x}_i=\dfrac{1}{2}(x_{i-1}+x_i)$ 为 $[x_{i-1},x_i]$ 的中点
+
+(图见笔记原图第 15 页)
+
+#### 梯形法则
+
+$$
+\int_a^b f(x)\,dx\approx T_n=\frac{\Delta x}{2}\left[f(x_0)+2f(x_1)+2f(x_2)+\cdots+2f(x_{n-1})+f(x_n)\right]
+$$
+
+其中 $\Delta x=\dfrac{b-a}{n}$,$x_i=a+i\Delta x$
+
+(图见笔记原图第 15 页)
+
+第 $i$ 个区间对应的梯形面积为
+
+$$
+\Delta x\left(\frac{f(x_{i-1})+f(x_i)}{2}\right)=\frac{\Delta x}{2}\left[f(x_{i-1})+f(x_i)\right]
+$$
+
+#### 误差
+
+$$
+\int_a^b f(x)\,dx=\text{近似值}+\text{误差}
+$$
+
+误差界:假设对于 $a\le x\le b$,$\lvert f''(x)\rvert\le K$,$E_T$ 和 $E_M$ 分别表示梯形法则和中点法则的误差
+
+$$
+\lvert E_T\rvert\le\frac{K(b-a)^3}{12n^2},\qquad \lvert E_M\rvert\le\frac{K(b-a)^3}{24n^2}
+$$
+
+#### 辛普森法则
+
+$$
+\int_a^b f(x)\,dx\approx S_n=\frac{\Delta x}{3}\left[f(x_0)+4f(x_1)+2f(x_2)+4f(x_3)+\cdots+2f(x_{n-2})+4f(x_{n-1})+f(x_n)\right]
+$$
+
+其中 $n$ 为偶数,$\Delta x=\dfrac{b-a}{n}$
+
+辛普森法则的误差界
+
+$$
+\lvert E_S\rvert\le\frac{K(b-a)^5}{180n^4}
+$$
+
+其中 $\lvert f^{(4)}(x)\rvert\le K$,$a\le x\le b$
+
+### 反常积分
+
+积分区间为无穷区间,或 $f$ 在区间 $[a,b]$ 上有无穷间断的情况,称这类积分为反常积分。
+
+#### 反常积分的定义(类型 1)
+
+(a) 如果对于任意 $t\ge a$,$\displaystyle\int_a^t f(x)\,dx$ 都存在,那么
+
+$$
+\int_a^{+\infty}f(x)\,dx=\lim_{t\to+\infty}\int_a^t f(x)\,dx
+$$
+
+只要极限存在
+
+(b) 如果对于任意 $t\le b$,$\displaystyle\int_t^b f(x)\,dx$ 都存在,那么
+
+$$
+\int_{-\infty}^b f(x)\,dx=\lim_{t\to-\infty}\int_t^b f(x)\,dx
+$$
+
+只要极限存在
+
+如果极限存在,则称反常积分收敛
+
+反之,称发散
+
+(c) 如果 $\displaystyle\int_a^{+\infty}f(x)\,dx$ 和 $\displaystyle\int_{-\infty}^{a}f(x)\,dx$ 都收敛
+
+定义
+
+$$
+\int_{-\infty}^{+\infty}f(x)\,dx=\int_{-\infty}^{a}f(x)\,dx+\int_a^{+\infty}f(x)\,dx
+$$
+
+$a$ 为任意实数
+
+e.g.
+
+$$
+A(t)=\int_1^t\frac{1}{x^2}\,dx=-\frac{1}{x}\Big|_1^t=1-\frac{1}{t}
+$$
+
+$$
+\lim_{t\to+\infty}A(t)=1
+$$
+
+$$
+\int_1^{+\infty}\frac{1}{x^2}\,dx=\lim_{t\to+\infty}\int_1^t\frac{1}{x^2}\,dx=1
+$$
+
+收敛
+
+如果 $p>1$,那么 $\displaystyle\int_1^{+\infty}\frac{1}{x^p}\,dx$ 收敛;反之发散
+
+#### 反常积分的定义(类型 2)
+
+(a) 如果 $f$ 在 $[a,b)$ 上连续且在 $b$ 处不连续,那么
+
+$$
+\int_a^b f(x)\,dx=\lim_{t\to b^-}\int_a^t f(x)\,dx
+$$
+
+只要极限存在
+
+(b) 如果 $f$ 在 $(a,b]$ 上连续且在 $a$ 处不连续,那么
+
+$$
+\int_a^b f(x)\,dx=\lim_{t\to a^+}\int_t^b f(x)\,dx
+$$
+
+只要极限存在
+
+如果极限存在,称反常积分收敛;反之,发散
+
+(c) 如果 $f$ 在 $c$ 处有间断,其中 $a<c<b$,并且 $\displaystyle\int_a^c f(x)\,dx$ 和 $\displaystyle\int_c^b f(x)\,dx$ 均收敛,定义
+
+$$
+\int_a^b f(x)\,dx=\int_a^c f(x)\,dx+\int_c^b f(x)\,dx
+$$
+
+#### 比较定理
+
+假设 $f$ 和 $g$ 是连续函数,且 $x\ge a$ 时 $f(x)\ge g(x)\ge 0$
+
+(a) 如果 $\displaystyle\int_a^{+\infty}f(x)\,dx$ 收敛,则 $\displaystyle\int_a^{+\infty}g(x)\,dx$ 收敛
+
+(b) 如果 $\displaystyle\int_a^{+\infty}g(x)\,dx$ 发散,则 $\displaystyle\int_a^{+\infty}f(x)\,dx$ 发散
+
 ## 八、积分的应用
 
 ### 曲线间的面积
@@ -1107,6 +1251,110 @@ $$
 f(c)=f_{\text{avg}}
 $$
 
+### 弧长公式
+
+如果 $f'$ 在 $[a,b]$ 上连续,那么曲线 $y=f(x)$,$a\le x\le b$ 的长度为
+
+$$
+L=\int_a^b\sqrt{1+[f'(x)]^2}\,dx=\int_a^b\sqrt{1+\left(\frac{dy}{dx}\right)^2}\,dx
+$$
+
+## 九、微分方程
+
+### 微分方程与初值问题
+
+通常,微分方程是包含一个未知函数及其一个或多个导数的等式
+
+最高阶导数称为微分方程的阶数
+
+e.g.
+
+$$
+y'=xy
+$$
+
+$y$ 是 $x$ 的未知函数
+
+如果将 $y=f(x)$ 及其导数代入微分方程后,方程成立
+
+那么 $f$ 为微分方程的解
+
+在许多问题中,解需要满足形如 $y(t_0)=y_0$ 的条件,这个条件称为初值条件,求微分方程满足初值条件的解的问题,称为初值问题
+
+一般地,有形如 $y'=F(x,y)$ 的一阶微分方程,$F(x,y)$ 是关于 $x,y$ 的表达式
+
+### 平衡解
+
+e.g.
+
+$$
+\frac{dP}{dt}=kP\left(1-\frac{P}{M}\right)
+$$
+
+$P(t)=0$,$P(t)=M$ 时,使方程右边的一个因子为 $0$
+
+这两个解称为平衡解
+
+### 欧拉法
+
+设步长为 $h$,初值问题 $y'=F(x,y)$,$y(x_0)=y_0$ 的解在 $x_n=x_{n-1}+h$ 处的近似值为
+
+$$
+y_n=y_{n-1}+hF(x_{n-1},y_{n-1}),\quad n=1,2,3,\cdots
+$$
+
+e.g. 令步长为 $0.1$,利用欧拉法计算初值问题
+
+$$
+y'=x+y,\quad y(0)=1,\quad F(x,y)=x+y,\quad x_0=0,\quad y_0=1
+$$
+
+有
+
+$$
+y_1=y_0+hF(x_0,y_0)=1+0.1\times(0+1)=1.1
+$$
+
+$$
+y_2=y_1+hF(x_1,y_1)=1.1+0.1\times(0.1+1.1)=1.22
+$$
+
+$$
+y_3=y_2+hF(x_2,y_2)=1.22+0.1\times(0.2+1.22)=1.362
+$$
+
+$$
+\cdots
+$$
+
+### 分离变量法
+
+可分离变量的微分方程可写成如下形式
+
+$$
+\frac{dy}{dx}=g(x)f(y)
+$$
+
+如果 $f(y)\ne 0$
+
+方程可以写成
+
+$$
+\frac{dy}{dx}=\frac{g(x)}{h(y)},\quad\text{其中}\ h(y)=\frac{1}{f(y)}
+$$
+
+然后写成微分的形式
+
+$$
+h(y)\,dy=g(x)\,dx
+$$
+
+两边积分
+
+$$
+\int h(y)\,dy=\int g(x)\,dx
+$$
+
 ## 笔记原图
 
 ![笔记原图 第 1 页](/images/calculus-handwritten-notes/notes-1.jpg)
@@ -1136,3 +1384,13 @@ $$
 ![笔记原图 第 13 页](/images/calculus-handwritten-notes/notes-13.jpg)
 
 ![笔记原图 第 14 页](/images/calculus-handwritten-notes/notes-14.jpg)
+
+![笔记原图 第 15 页](/images/calculus-handwritten-notes/notes-15.jpg)
+
+![笔记原图 第 16 页](/images/calculus-handwritten-notes/notes-16.jpg)
+
+![笔记原图 第 17 页](/images/calculus-handwritten-notes/notes-17.jpg)
+
+![笔记原图 第 18 页](/images/calculus-handwritten-notes/notes-18.jpg)
+
+![笔记原图 第 19 页](/images/calculus-handwritten-notes/notes-19.jpg)
