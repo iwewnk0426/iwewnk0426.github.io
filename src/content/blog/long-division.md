@@ -2,7 +2,8 @@
 title: 多项式长除法:怎么做,什么时候用
 description: 把假分式拆成多项式加真分式的长除法,分步骤写清楚,附微积分笔记里的两道例题。
 publishDate: 2026-11-11
-category: 数学
+category: 微积分
+tags: [数学, 方法, 例题, 积分]
 ---
 
 我在[微积分笔记](/blog/calculus-handwritten-notes/)的部分分式法里写过一句:假分式要先用长除法。这篇把长除法单独拿出来讲。

@@ -2,7 +2,8 @@
 title: 欧拉换元:把根式积分变成有理函数积分
 description: 欧拉换元的三种形式,各自什么时候用、怎么解出 x 和 dx,附三道完整例题。
 publishDate: 2026-11-11
-category: 数学
+category: 微积分
+tags: [数学, 方法, 例题, 积分]
 ---
 
 在[一题多解:求 ∫√(x²+1) dx](/blog/integral-sqrt-x2-plus-1/) 里,方法四用了欧拉换元 $\sqrt{x^2+1}=t-x$,换完根号就没了。这篇把欧拉换元单独讲清楚。

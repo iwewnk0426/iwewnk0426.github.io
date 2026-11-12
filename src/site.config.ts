@@ -42,6 +42,7 @@ export const theme: ThemeUserConfig = {
     menu: [
       { title: '博客', link: '/blog' },
       { title: '分类', link: '/categories' },
+      { title: '标签', link: '/tags' },
       { title: '关于', link: '/about' }
     ]
   },

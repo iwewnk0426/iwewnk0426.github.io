@@ -2,7 +2,8 @@
 title: 一题多解:求 ∫√(x²+1) dx
 description: 用分部积分、三角换元、双曲换元和欧拉换元四种方法求 ∫√(x²+1) dx,并对照我的微积分笔记。
 publishDate: 2026-11-11
-category: 数学
+category: 微积分
+tags: [数学, 例题, 积分]
 ---
 
 求
