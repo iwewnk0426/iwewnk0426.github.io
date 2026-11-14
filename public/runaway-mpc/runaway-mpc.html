@@ -80,6 +80,7 @@
   .file-btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(180deg,#5a5d66,#2e3034)}
   .file-btn input[type=file]{position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:24px}
   .btn.nud{padding:8px 10px;min-width:48px}
+  .btn.preset-btn{background:linear-gradient(180deg,#7a5a1e,#4a3510);color:#ffe7a8}
   .pad .src.local{color:#ffd24a}
   .pad.editing{outline:2px solid var(--lcd);outline-offset:1px}
   .pad.has-user::before{content:"";position:absolute;top:7px;right:36px;width:7px;height:7px;border-radius:50%;background:#ffd24a;box-shadow:0 0 6px #ffd24a;pointer-events:none}
@@ -114,7 +115,7 @@
     <button class="btn" id="btnDemo" title="快捷键：P">示范前奏</button>
     <button class="btn" id="btnMetro" title="快捷键：M">节拍器</button>
     <button class="btn" id="btnStop" title="快捷键：Esc">全部停止</button>
-    <label class="ctl">BPM <input type="number" id="bpm" min="50" max="180" step="1" value="87"></label>
+    <label class="ctl">BPM <input type="number" id="bpm" min="50" max="180" step="0.1" value="87"></label>
     <label class="ctl">音量 <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8"></label>
     <label class="ctl">混响 <input type="range" id="rev" min="0" max="1" step="0.01" value="0.35"></label>
   </div>
@@ -143,6 +144,13 @@
       <button type="button" class="btn" id="btnPreview">试听</button>
       <button type="button" class="btn" id="btnAutoSlice">自动切</button>
     </div>
+    <div class="row" id="presetRow">
+      <button type="button" class="btn preset-btn" id="btnPreset" title="按原曲分析好的时间点，把你导入的这首歌切到 16 个垫子">Runaway 预设切点</button>
+      <label class="ctl">整体偏移（秒） <input type="number" id="presetOffset" step="0.01" value="0"></label>
+      <button type="button" class="btn nud" id="presetOffM" title="预设整体提前 0.02 秒">−0.02</button>
+      <button type="button" class="btn nud" id="presetOffP" title="预设整体推后 0.02 秒">+0.02</button>
+    </div>
+    <div class="hint" id="presetInfo">「Runaway 预设切点」只用于你自己导入的 Runaway（按 5:50 版本、87 BPM 分析）：高音 E / D# / C#、低八度音、E · D#m · C#m · A 四个整小节、底鼓、军鼓、进鼓重拍和 “Look at ya”。「自动切」会先测速度，再把切点吸附到拍子上，长度取整拍。</div>
     <div class="row">
       <button type="button" class="btn" id="btnRestorePad">恢复合成音</button>
       <button type="button" class="btn" id="btnRestoreAll">全部恢复</button>
@@ -167,7 +175,7 @@
       手机上第一次点击会唤醒音频；如果没声音，请关掉静音开关再点一次。
     </div>
   </details>
-  <div class="note">所有默认声音都是浏览器实时合成的替身音色，不含原曲录音或任何人声片段。“Look at ya” 垫子是合成的类人声音效，不是原版采样。</div>
+  <div class="note">默认状态下所有声音都是浏览器实时合成的替身音色，页面不含原曲录音或任何人声片段；“Look at ya” 垫子默认是合成的类人声音效，不是原版采样。只有在你「从本地导入音频」或套用「Runaway 预设切点」之后，垫子才会改用你自己设备上的本地音频，文件不会上传。</div>
 </div>
 
 <script>
@@ -177,13 +185,13 @@
 // ---------- Pad definitions (order = screen order = key order) ----------
 const NOTE = n => 440 * Math.pow(2, (n - 69) / 12); // MIDI -> Hz
 const PADS = [
-  {key:"1", code:"Digit1", name:"E5 Intro", desc:"前奏高音 E", file:"piano-e.wav",   group:"piano", play:t=>pianoNote(76,t,1.0,true)},
-  {key:"2", code:"Digit2", name:"D#5",      desc:"往下一级",   file:"piano-ds.wav",  group:"piano", play:t=>pianoNote(75,t,0.95,true)},
-  {key:"3", code:"Digit3", name:"C#5",      desc:"再往下",     file:"piano-cs.wav",  group:"piano", play:t=>pianoNote(73,t,0.95,true)},
+  {key:"1", code:"Digit1", name:"E6 Intro", desc:"前奏高音 E", file:"piano-e.wav",   group:"piano", play:t=>pianoNote(88,t,1.0,true)},
+  {key:"2", code:"Digit2", name:"D#6",      desc:"往下一级",   file:"piano-ds.wav",  group:"piano", play:t=>pianoNote(87,t,0.95,true)},
+  {key:"3", code:"Digit3", name:"C#6",      desc:"再往下",     file:"piano-cs.wav",  group:"piano", play:t=>pianoNote(85,t,0.95,true)},
   {key:"4", code:"Digit4", name:"E maj",    desc:"E 和弦·长音", file:"chord-e.wav", group:"chord", play:t=>pianoChord([40,52,56,59,64],t,0.75)},
   {key:"Q", code:"KeyQ",   name:"C#m",      desc:"升 C 小和弦", file:"chord-csm.wav", group:"chord", play:t=>pianoChord([37,49,56,61,64],t,0.75)},
   {key:"W", code:"KeyW",   name:"A maj",    desc:"A 大三和弦",  file:"chord-a.wav",   group:"chord", play:t=>pianoChord([33,45,57,61,64],t,0.75)},
-  {key:"E", code:"KeyE",   name:"B maj",    desc:"B 大三和弦",  file:"chord-b.wav",   group:"chord", play:t=>pianoChord([35,47,54,59,63],t,0.75)},
+  {key:"E", code:"KeyE",   name:"D#m",      desc:"升 D 小和弦", file:"chord-dsm.wav", group:"chord", play:t=>pianoChord([39,51,58,63,66],t,0.75)},
   {key:"R", code:"KeyR",   name:"808 Sub",  desc:"低音 E",      file:"sub-808.wav",   group:"chord", play:t=>sub808(28,t)},
   {key:"A", code:"KeyA",   name:"Kick",     desc:"底鼓",        file:"kick.wav",      group:"drum",  play:t=>kick(t,1)},
   {key:"S", code:"KeyS",   name:"Snare+Bell",desc:"军鼓·铃",    file:"snare.wav",     group:"drum",  play:t=>snare(t,1)},
@@ -194,7 +202,8 @@ const PADS = [
   {key:"C", code:"KeyC",   name:"Riser",    desc:"上升 / 反向", file:"riser.wav",     group:"fx",    play:t=>riser(t)},
   {key:"V", code:"KeyV",   name:"Crash",    desc:"镲片",        file:"crash.wav",     group:"fx",    play:t=>crash(t)},
 ];
-PADS.forEach((p,i)=>{p.idx=i; p.buffer=null; p.source="synth"; p.sliceStart=0; p.sliceLen=null; p.fileKey=null; p.localName=null;});
+PADS.forEach((p,i)=>{p.idx=i; p.buffer=null; p.source="synth"; p.sliceStart=0; p.sliceLen=null; p.fileKey=null; p.localName=null; p.label=null; p.loopSafe=false;});
+PADS[0].synthMidi=88; PADS[1].synthMidi=87; PADS[2].synthMidi=85;
 const byCode = Object.fromEntries(PADS.map(p=>[p.code,p]));
 const PAD = name => PADS.find(p=>p.file===name);
 
@@ -591,7 +600,7 @@ function slicesFromOnsets(onsets, duration, n, cap){
 function applySlices(slices, name, fileKey, buffer){
   PADS.forEach((p,i)=>{
     const sl=slices[i];
-    p.buffer=buffer; p.sliceStart=sl.start; p.sliceLen=sl.len;
+    p.buffer=buffer; p.sliceStart=sl.start; p.sliceLen=sl.len; p.label=sl.label||null; p.loopSafe=!!sl.loopSafe; p.midi=sl.midi||null;
     p.source="切片:"+(name||"local"); p.fileKey=fileKey; p.localName=name;
     refreshPad(p);
   });
@@ -599,7 +608,7 @@ function applySlices(slices, name, fileKey, buffer){
   schedulePersist();
 }
 function assignWholeToPad(p, buf, name, fileKey){
-  p.buffer=buf; p.sliceStart=0; p.sliceLen=null;
+  p.buffer=buf; p.sliceStart=0; p.sliceLen=null; p.label=null; p.loopSafe=false; p.midi=null;
   p.source="本地:"+name; p.fileKey=fileKey; p.localName=name;
   refreshPad(p); selectPad(p);
 }
@@ -655,18 +664,185 @@ function previewSlice(){
     setMode("试听 "+selectedPad.key+" · "+a+"s + "+b+"s");
   }).catch(()=>{});
 }
-function autoSliceAll(){
-  if(!sharedSong || !sharedSong.buffer){
-    if(selectedPad && selectedPad.buffer){
-      sharedSong={buffer:selectedPad.buffer, name:selectedPad.localName||"local", fileKey:selectedPad.fileKey||newFileKey(), dur:selectedPad.buffer.duration};
-      showImportInfo();
-    }else{ setMode("请先导入一首较长的音频"); return; }
+// ---------- Beat analysis (runs locally on the imported buffer) ----------
+// Onset envelope on a 4x-decimated mono signal (~11 kHz, 23 ms hop), plus a low band for downbeats.
+function onsetEnvelope(buffer){
+  const mono=mixMono(buffer), dec=4, sr=buffer.sampleRate/dec;
+  const n=Math.floor(mono.length/dec), x=new Float32Array(n);
+  for(let i=0;i<n;i++){ const j=i*dec; x[i]=(mono[j]+mono[j+1]+mono[j+2]+mono[j+3])*0.25; }
+  const frame=1024, hop=256, nF=Math.max(0, Math.floor((n-frame)/hop)+1);
+  const env=new Float32Array(nF), low=new Float32Array(nF);
+  const lowBins=Math.max(2, Math.round(150/(sr/frame)));
+  let prev=null;
+  for(let f=0;f<nF;f++){
+    const m=fftMag(x, f*hop, frame);
+    for(let k=0;k<m.length;k++) m[k]=Math.log1p(m[k]*20);
+    if(prev){ let v=0, lv=0; for(let k=1;k<m.length;k++){ const d=m[k]-prev[k]; if(d>0){ v+=d; if(k<=lowBins) lv+=d; } } env[f]=v; low[f]=lv; }
+    prev=m;
   }
-  const buf=sharedSong.buffer;
-  const {slices, auto}=slicesFromOnsets(detectOnsets(buf), buf.duration, 16, 2);
-  applySlices(slices, sharedSong.name, sharedSong.fileKey, buf);
-  setMode(auto ? "已按音头自动切成 16 段" : "未检测到足够音头，已按均等切片");
+  const w=10, hp=new Float32Array(nF);
+  for(let i=0;i<nF;i++){ let a=0,c=0; for(let j=Math.max(0,i-w);j<=Math.min(nF-1,i+w);j++){ a+=env[j]; c++; } hp[i]=Math.max(0, env[i]-a/c); }
+  let mx=1e-9; for(const v of hp) if(v>mx) mx=v;
+  for(let i=0;i<nF;i++) hp[i]/=mx;
+  // frame f covers [f*hop, f*hop+frame); flux peaks ~1.5 hops after the frame centre (calibrated on piano attacks)
+  return {env:hp, low, fps:sr/hop, t0:(frame/2+1.5*hop)/sr, n:nF};
 }
+function envAt(a, pos){ const i=Math.floor(pos); if(i<0||i+1>=a.length) return 0; const fr=pos-i; return a[i]*(1-fr)+a[i+1]*fr; }
+function combScore(env, P, ph){ let s=0,c=0; for(let p=ph;p<env.length-1;p+=P){ s+=envAt(env,p)+0.5*envAt(env,p+P/2); c++; } return c?s/c:0; }
+function analyzeBeats(buffer){
+  const E=onsetEnvelope(buffer), env=E.env, fps=E.fps;
+  if(E.n<fps*4) return null;
+  // 1) coarse tempo: autocorrelation over 60-180 BPM, log-gaussian prior around 95 BPM
+  let best=null;
+  for(let bpm=60;bpm<=180;bpm+=0.5){
+    const lag=60*fps/bpm; let s=0;
+    for(let i=0;i+lag+1<env.length;i+=1) s+=env[i]*envAt(env,i+lag);
+    s/=env.length;
+    const pr=Math.exp(-0.5*Math.pow(Math.log2(bpm/95)/0.8,2));
+    if(!best||s*pr>best.s) best={bpm,s:s*pr};
+  }
+  let bpm0=best.bpm; while(bpm0>=140) bpm0/=2; while(bpm0<70) bpm0*=2;
+  // 2) refine tempo + phase with a comb over the whole track
+  let fit={s:-1};
+  for(let b=bpm0*0.97;b<=bpm0*1.03;b+=0.02){
+    const P=60*fps/b;
+    for(let ph=0;ph<P;ph+=0.5){ const sc=combScore(env,P,ph); if(sc>fit.s) fit={s:sc,bpm:b,P,ph}; }
+  }
+  for(let b=fit.bpm-0.03;b<=fit.bpm+0.03;b+=0.005){ const P=60*fps/b; for(let ph=fit.ph-1;ph<=fit.ph+1;ph+=0.1){ const sc=combScore(env,P,ph); if(sc>fit.s) fit={s:sc,bpm:b,P,ph:(ph+P)%P}; } }
+  const P=fit.P, ph=fit.ph;
+  // 3) downbeat: which of the 4 beat positions carries the most low-band (kick) energy
+  const acc=[0,0,0,0];
+  for(let k=0, p=ph; p<E.n-1; k++, p+=P) acc[k%4]+=envAt(E.low,p);
+  const db=acc.indexOf(Math.max(...acc));
+  const beatSec=60/fit.bpm, firstBeat=E.t0+ph/fps;
+  return {bpm:fit.bpm, beatSec, firstBeat, downbeat:db, env, fps, t0:E.t0};
+}
+function snapToGrid(t, g, sub){ const q=g.beatSec/sub; return g.firstBeat+Math.round((t-g.firstBeat)/q)*q; }
+// Beat-aware slicing: one slice per region of the song, each starting on the beat grid (8th notes),
+// length a whole number of beats (or half a beat) so pads loop on time.
+function beatSlices(buffer, n){
+  const g=analyzeBeats(buffer); if(!g) return null;
+  const dur=buffer.duration, B=g.beatSec;
+  const cand=[];
+  for(let k=0;;k++){
+    const t=g.firstBeat+k*B/2; if(t>dur-B*0.5) break; if(t<0) continue;
+    const pos=(t-g.t0)*g.fps; let s=0; for(let d=-1;d<=1;d++) s=Math.max(s, envAt(g.env,pos+d));
+    const beatIdx=k/2, onBeat=Number.isInteger(beatIdx), isDown=onBeat && ((beatIdx-g.downbeat)%4+4)%4===0;
+    cand.push({t, s, w:s*(isDown?1.25:onBeat?1:0.7), k});
+  }
+  if(cand.length<n) return null;
+  // skip leading/trailing silence
+  const mono=mixMono(buffer), sr=buffer.sampleRate; let a=0, z=mono.length-1, pk=0;
+  for(const v of mono) if(Math.abs(v)>pk) pk=Math.abs(v);
+  while(a<z && Math.abs(mono[a])<pk*0.02) a++; while(z>a && Math.abs(mono[z])<pk*0.02) z--;
+  const t0=a/sr, t1=z/sr, region=(t1-t0)/n, used=new Set(), out=[];
+  for(let i=0;i<n;i++){
+    const lo=t0+i*region, hi=lo+region;
+    let bestC=null; for(const c of cand) if(c.t>=lo-B*0.25 && c.t<hi && !used.has(c.k) && (!bestC||c.w>bestC.w)) bestC=c;
+    if(!bestC) return null;
+    used.add(bestC.k);
+    // length: whole beats until the next comparably strong hit, as 0.5 / 1 / 2 / 4 beats
+    let gapBeats=4;
+    for(const c of cand){ if(c.k<=bestC.k) continue; if((c.k-bestC.k)/2>4) break; if(c.s>=bestC.s*0.6){ gapBeats=(c.k-bestC.k)/2; break; } }
+    const lenBeats=gapBeats>=4?4:gapBeats>=2?2:gapBeats>=1?1:0.5;
+    const start=Math.max(0,bestC.t-0.005);
+    out.push({start:+start.toFixed(4), len:+Math.min(lenBeats*B, dur-start).toFixed(4), beats:lenBeats});
+  }
+  return {slices:out, grid:g};
+}
+function setBpm(v){ bpm=Math.min(180,Math.max(50,Math.round(v*10)/10)); $("bpm").value=bpm; $("lcdBpm").textContent=bpm; }
+function ensureSharedSong(){
+  if(sharedSong && sharedSong.buffer) return true;
+  if(selectedPad && selectedPad.buffer){
+    sharedSong={buffer:selectedPad.buffer, name:selectedPad.localName||"local", fileKey:selectedPad.fileKey||newFileKey(), dur:selectedPad.buffer.duration};
+    showImportInfo(); return true;
+  }
+  setMode("请先导入一首较长的音频"); return false;
+}
+function autoSliceAll(){
+  if(!ensureSharedSong()) return;
+  const buf=sharedSong.buffer;
+  setMode("正在测速度、对齐拍子…");
+  setTimeout(()=>{
+    let r=null; try{ r=beatSlices(buf,16); }catch(e){ r=null; }
+    if(r){
+      applySlices(r.slices, sharedSong.name, sharedSong.fileKey, buf);
+      sharedSong.grid={bpm:r.grid.bpm, firstBeat:r.grid.firstBeat, downbeat:r.grid.downbeat};
+      setBpm(r.grid.bpm);
+      setMode("已按拍子切成 16 段 · 测得 "+r.grid.bpm.toFixed(1)+" BPM");
+    }else{
+      const {slices, auto}=slicesFromOnsets(detectOnsets(buf), buf.duration, 16, 2);
+      applySlices(slices, sharedSong.name, sharedSong.fileKey, buf);
+      setMode(auto ? "没测出稳定速度，已按音头切成 16 段" : "未检测到足够音头，已按均等切片");
+    }
+  }, 30);
+}
+
+// ---------- Runaway preset (times measured from a 350.09 s, 87.0 BPM version of the song) ----------
+// Numbers only: no audio from the song is stored in this page. Beat n is at PRESET.beat0 + n*60/87.
+// Downbeats fall on beats 3, 7, 11, ... (the piano Es land on beats 2 and 4; drums enter at beat 55).
+const PRESET={
+  refDur:350.09, bpm:87.0, beat0:0.851, refFirstSound:0.84, tolerance:1.5,
+  pads:[
+    {beat:0,     beats:2,   name:"E6 高音 E",  desc:"前奏第 1 个音",   midi:88},
+    {beat:32,    beats:2,   name:"D#6",        desc:"往下一级",        midi:87},
+    {beat:40,    beats:2,   name:"C#6",        desc:"再往下",          midi:85},
+    {beat:119,   beats:4,   name:"E 小节",     desc:"E 和弦 · 1 小节", loop:true},
+    {beat:127,   beats:4,   name:"D#m 小节",   desc:"D#m · 1 小节",    loop:true},
+    {beat:135,   beats:4,   name:"C#m 小节",   desc:"C#m · 1 小节",    loop:true},
+    {beat:143,   beats:4,   name:"A 小节",     desc:"A · 1 小节",      loop:true},
+    {beat:30,    beats:2,   name:"E5 低八度",  desc:"第 16 个音",      midi:76},
+    {beat:285.5, beats:0.5, name:"Kick",       desc:"底鼓",            drum:true},
+    {beat:136,   beats:0.5, name:"Snare",      desc:"军鼓",            drum:true, pre:0.025},
+    {beat:38,    beats:2,   name:"D#5 低",     desc:"低八度 D#",       midi:75},
+    {beat:55,    beats:2,   name:"进鼓重拍",   desc:"鼓进来的第 1 拍", pre:0.025},
+    {beat:230.5, beats:1,   name:"Look at ya", desc:"人声 · 1 拍"},
+    {beat:46,    beats:2,   name:"C#5 低",     desc:"低八度 C#",       midi:73},
+    {beat:48,    beats:2,   name:"A5",         desc:"前奏 A",          midi:81},
+    {beat:52,    beats:2,   name:"G#5",        desc:"前奏 G#",         midi:80},
+  ]
+};
+function presetSlices(offset){
+  const B=60/PRESET.bpm;
+  return PRESET.pads.map(p=>{
+    const pre=p.pre!=null?p.pre:0.015; // start a hair before the measured attack
+    const start=Math.max(0, PRESET.beat0+p.beat*B+offset-pre);
+    const len=p.beats*B-(p.beats>=1?0.015:0.005);
+    return {start:+start.toFixed(4), len:+len.toFixed(4), label:{name:p.name, desc:p.desc}, loopSafe:!!p.drum, midi:p.midi||null};
+  });
+}
+function firstSoundTime(buffer){
+  const mono=mixMono(buffer), sr=buffer.sampleRate, win=Math.round(sr*0.01);
+  let pk=0; for(const v of mono) if(Math.abs(v)>pk) pk=Math.abs(v);
+  const thr=pk*0.05;
+  for(let i=0;i+win<mono.length;i+=win){ let s=0; for(let j=i;j<i+win;j++) s+=mono[j]*mono[j]; if(Math.sqrt(s/win)>thr) return i/sr; }
+  return 0;
+}
+let presetState=null; // {auto, manual}
+function applyPreset(opts={}){
+  if(!ensureSharedSong()) return null;
+  const buf=sharedSong.buffer, diff=buf.duration-PRESET.refDur;
+  if(Math.abs(diff)>PRESET.tolerance && !opts.force){
+    const msg="你导入的版本时长 "+buf.duration.toFixed(2)+" 秒，预设是按 "+PRESET.refDur.toFixed(2)+" 秒的版本测的（差 "+diff.toFixed(1)+" 秒），切点可能对不上。\n\n确定：改用按拍子的「自动切」\n取消：仍然套用预设（可用整体偏移微调）";
+    const useAuto = opts.confirm ? opts.confirm(msg) : window.confirm(msg);
+    if(useAuto){ autoSliceAll(); return {mode:"auto"}; }
+  }
+  // small alignment for decoder padding: compare where sound starts vs the analysed version
+  let auto=0;
+  if(PRESET.refFirstSound!=null){ const d=firstSoundTime(buf)-PRESET.refFirstSound; if(Math.abs(d)<=0.5) auto=d; }
+  const manual=+$("presetOffset").value||0;
+  presetState={auto, manual};
+  const sl=presetSlices(auto+manual);
+  applySlices(sl, sharedSong.name, sharedSong.fileKey, buf);
+  setBpm(PRESET.bpm);
+  setMode("已套用 Runaway 预设切点"+(Math.abs(auto+manual)>=0.005?" · 偏移 "+(auto+manual>=0?"+":"")+(auto+manual).toFixed(2)+"s":""));
+  return {mode:"preset", auto, manual, slices:sl};
+}
+function nudgePreset(d){
+  const el=$("presetOffset"); el.value=((+el.value||0)+d).toFixed(2);
+  if(presetState) applyPreset({force:true});
+}
+
 async function ingestFile(file, mode){
   try{ await ensureAudio(); }catch(e){ return; }
   setMode("正在解码…");
@@ -689,7 +865,7 @@ async function ingestFile(file, mode){
   }catch(e){ alert("这个文件解码失败，换一个 wav / mp3 / m4a 试试。"); setMode("解码失败"); }
 }
 function restorePad(p){
-  p.buffer=null; p.sliceStart=0; p.sliceLen=null; p.source="synth"; p.fileKey=null; p.localName=null;
+  p.buffer=null; p.sliceStart=0; p.sliceLen=null; p.source="synth"; p.fileKey=null; p.localName=null; p.label=null; p.loopSafe=false; p.midi=null;
   refreshPad(p); syncSliceFields();
 }
 function restoreAllPads(){
@@ -730,7 +906,7 @@ async function persistLocal(){
     const files=tx.objectStore("files"), meta=tx.objectStore("meta");
     const padRecs=PADS.map(p=>{
       if(!isUser(p) || !p.fileKey) return {idx:p.idx, source:"synth"};
-      return {idx:p.idx, source:p.source, fileKey:p.fileKey, sliceStart:p.sliceStart||0, sliceLen:p.sliceLen, name:p.localName||""};
+      return {idx:p.idx, source:p.source, fileKey:p.fileKey, sliceStart:p.sliceStart||0, sliceLen:p.sliceLen, name:p.localName||"", label:p.label||null, loopSafe:!!p.loopSafe, midi:p.midi||null};
     });
     const keys=new Set(padRecs.filter(r=>r.fileKey).map(r=>r.fileKey));
     if(sharedSong && sharedSong.fileKey) keys.add(sharedSong.fileKey);
@@ -770,7 +946,7 @@ async function restoreLocalAudio(){
       }
       const d=decoded[rec.fileKey]; if(!d) continue;
       p.buffer=d.buf; p.sliceStart=rec.sliceStart||0; p.sliceLen=rec.sliceLen;
-      p.source=rec.source; p.fileKey=rec.fileKey; p.localName=rec.name||d.name;
+      p.source=rec.source; p.fileKey=rec.fileKey; p.localName=rec.name||d.name; p.label=rec.label||null; p.loopSafe=!!rec.loopSafe; p.midi=rec.midi||null;
       refreshPad(p);
     }
     if(state.songKey && decoded[state.songKey]){
@@ -820,6 +996,10 @@ function initImportUI(){
   });
   $("btnPreview").addEventListener("click", previewSlice);
   $("btnAutoSlice").addEventListener("click", autoSliceAll);
+  $("btnPreset").addEventListener("click",()=>{ ensureAudio().catch(()=>{}); applyPreset(); });
+  $("presetOffset").addEventListener("change",()=>{ if(presetState) applyPreset({force:true}); });
+  $("presetOffM").addEventListener("click",()=>nudgePreset(-0.02));
+  $("presetOffP").addEventListener("click",()=>nudgePreset(0.02));
   $("btnRestorePad").addEventListener("click",()=>{
     restorePad(selectedPad);
     schedulePersist();
@@ -850,7 +1030,7 @@ function trigger(p,t=null,visual=true){
 }
 function flash(p,when){
   const delay=Math.max(0,(when-ctx.currentTime)*1000);
-  setTimeout(()=>{ const el=p.el; el.classList.add("hit"); $("lcdPad").textContent=`${p.key} · ${p.name} (${p.desc})`;
+  setTimeout(()=>{ const el=p.el; el.classList.add("hit"); const lb=p.label&&p.buffer?p.label:p; $("lcdPad").textContent=`${p.key} · ${lb.name} (${lb.desc})`;
     clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("hit"),110); }, delay);
 }
 
@@ -861,9 +1041,10 @@ let metroOn=false, demo=null; // demo: {start, events}
 const LOOKAHEAD=25, AHEAD=0.12, SPB=16; // 16 steps per bar
 const stepDur=()=>60/bpm/4;
 
-// drum loop (1 bar, 16 steps). Boom-bap feel, approximate — not a transcription.
+// drum loop (1 bar, 16 steps). Measured from the song's drum part: kick on 1 and the "and" of 3,
+// snare/clap on 2 and 4, eighth-note hats. Synthesized; no recording is used.
 const LOOP = {
-  kick:  [1,0,0,0, 0,0,0,0, 1,0,1,0, 0,0,0,0],
+  kick:  [1,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
   snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
   hat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,1],
   sub:   [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
@@ -900,31 +1081,33 @@ function scheduleStep(s,t){
   if(demo){
     const rel=s-demo.start;
     if(rel>=0){ for(const ev of demo.events) if(ev.step===rel) ev.fn(t);
-      if(rel>=demo.len){ demo=null; uiLater(t,()=>{updateButtons();setMode("示范结束 · 换你来");}); } }
+      if(rel>=demo.len){ demo=null; trigger(PAD("big-hit.wav"),t); trigger(PAD("crash.wav"),t);
+        uiLater(t,()=>{updateButtons();setMode("进鼓！示范结束 · 换你来");}); } }
   }
   uiLater(t,()=>{ $("lcdPos").textContent=`${Math.floor(s/SPB)+1}.${Math.floor(i/4)+1}`; });
 }
-function trigLoop(file,t,synthFn){ const p=PAD(file); if(p.buffer) playBuffer(p,t); else synthFn(); flash(p,t); }
+// Slices of a whole song (自动切 / 预设) are not drum hits: the loop uses them only when marked loop-safe
+// (preset kick/snare). Samples from samples/ or a file put whole on a pad still play in the loop.
+function loopBuffer(p){ return p.buffer && (p.loopSafe || p.sliceLen==null || p.source==="samples/"); }
+function trigLoop(file,t,synthFn){ const p=PAD(file); if(loopBuffer(p)) playBuffer(p,t); else synthFn(); flash(p,t); }
 function uiLater(t,fn){ setTimeout(fn,Math.max(0,(t-ctx.currentTime)*1000)); }
 
-// Demo intro (APPROXIMATE arrangement, see tutorial):
-//  bars 1-4 : high E quarter notes, 15 times, 16th beat drops to D#
-//  bars 5-8 : "E E E + lower note" per bar over E / C#m / A / B chords
-function buildDemo(){
-  const ev=[], add=(bar,beat,fn)=>ev.push({step:(bar-1)*SPB+(beat-1)*4,fn});
-  const E=PAD("piano-e.wav"), DS=PAD("piano-ds.wav"), CS=PAD("piano-cs.wav");
-  for(let bar=1;bar<=4;bar++) for(let beat=1;beat<=4;beat++) add(bar,beat,t=>trigger(bar===4&&beat===4?DS:E,t));
-  const chords=["chord-e.wav","chord-csm.wav","chord-a.wav","chord-b.wav"], low=[DS,CS,CS,DS];
-  for(let k=0;k<4;k++){ const bar=5+k;
-    add(bar,1,t=>trigger(PAD(chords[k]),t));
-    for(let beat=1;beat<=3;beat++) add(bar,beat,t=>trigger(E,t));
-    add(bar,4,t=>trigger(low[k],t));
-  }
-  add(8,1,t=>trigger(PAD("riser.wav"),t));
-  add(9,1,t=>{ trigger(PAD("big-hit.wav"),t); trigger(PAD("crash.wav"),t); trigger(E,t); });
-  return {events:ev,len:8*SPB+1};
+// Demo intro, timed from the song (87 BPM): one piano note every 2 beats, on beats 2 and 4.
+//  bars 1-8  : high E6 x15, then E5 an octave lower
+//  bars 9-14 : D#6 x3 + D#5, C#6 x3 + C#5, A5 A5 G#5, E6 pickup
+//  bar 15    : drums enter on beat 1 (BIG HIT + crash), drum loop keeps going
+const INTRO_NOTES=[...Array(15).fill(88),76, 87,87,87,75, 85,85,85,73, 81,81,80,88];
+function notePlayer(midi){
+  const p=PADS.find(x=>x.midi===midi && x.buffer) || PADS.find(x=>x.synthMidi===midi && !x.buffer);
+  if(p) return t=>trigger(p,t);
+  return t=>pianoNote(midi,t,midi>=85?1.0:0.9,true);
 }
-
+function buildDemo(){
+  const ev=[], add=(bar,beat,fn)=>ev.push({step:(bar-1)*SPB+Math.round((beat-1)*4),fn});
+  INTRO_NOTES.forEach((m,i)=>{ const bar=1+Math.floor(i/2), beat=(i%2)?4:2; add(bar,beat,notePlayer(m)); });
+  add(14,1,t=>trigger(PAD("riser.wav"),t));
+  return {events:ev,len:14*SPB, drumsAt:14*SPB};
+}
 // ---------- UI ----------
 function $(id){ return document.getElementById(id); }
 function setMode(s){ $("lcdMode").textContent=s; }
@@ -947,8 +1130,9 @@ function toggleDrums(){
 function toggleMetro(){ ensureAudio(); metroOn=!metroOn; if(metroOn) startTransport(); updateButtons(); }
 function toggleDemo(){
   ensureAudio();
-  if(demo){ demo=null; updateButtons(); setMode("示范已停 DEMO OFF"); return; }
+  if(demo){ demo=null; drumsStartStep=-1; updateButtons(); setMode("示范已停 DEMO OFF"); return; }
   const wasRunning=running; const d=buildDemo(); d.start = wasRunning ? nextBarStep() : 0; demo=d;
+  if(!drumsOn) drumsStartStep=d.start+d.drumsAt;
   if(!wasRunning) startTransport();
   setMode("示范前奏 DEMO"); updateButtons();
 }
@@ -966,12 +1150,15 @@ function buildGrid(){
     tr.innerHTML=`<td><b>${p.key}</b> ${p.name}</td><td class="fn"><code>samples/${p.file}</code></td><td class="st"></td>
       <td><label class="file">本地文件<input type="file"></label></td><td><button>还原</button></td>`;
     tr.querySelector("input").addEventListener("change",e=>{ const f=e.target.files[0]; if(f) loadLocalFile(p,f); e.target.value=""; });
-    tr.querySelector("button").addEventListener("click",()=>{ p.buffer=null; p.source="synth"; refreshPad(p); });
+    tr.querySelector("button").addEventListener("click",()=>{ restorePad(p); schedulePersist(); });
     tbl.appendChild(tr); p.row=tr; refreshPad(p);
   });
 }
 function refreshPad(p){
   const s=p.el.querySelector(".src"), st=p.row.querySelector(".st");
+  const lb=p.label && p.buffer ? p.label : null;
+  p.el.querySelector(".n").textContent=lb?lb.name:p.name;
+  p.el.querySelector(".d").textContent=lb?lb.desc:p.desc;
   const user=isUser(p), isS=p.source!=="synth";
   s.textContent=user?"本地":(isS?"SMP":"SYN");
   s.classList.toggle("sample", isS && !user);
@@ -992,6 +1179,12 @@ window.__mpc={
   triggerIdx(i){ trigger(PADS[i]); return {ok:true, ctx:ctx&&ctx.state}; },
   mode(){ return $("lcdMode").textContent; },
   autoSlice(){ autoSliceAll(); return $("lcdMode").textContent; },
+  analyze(){ return sharedSong ? analyzeBeats(sharedSong.buffer) : null; },
+  beatSlices(){ return sharedSong ? beatSlices(sharedSong.buffer,16) : null; },
+  firstSound(){ return sharedSong ? firstSoundTime(sharedSong.buffer) : null; },
+  preset(o){ return applyPreset(Object.assign({confirm:()=>false},o||{})); },
+  presetTable(){ return presetSlices(0); },
+  bpm(){ return bpm; },
   ctxState(){ return ctx?ctx.state:null; }
 };
 $("btnDrums").addEventListener("click",toggleDrums);
