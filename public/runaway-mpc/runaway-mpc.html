@@ -130,7 +130,7 @@
     <div class="row">
       <label class="ctl">垫子 <select id="padSelect"></select></label>
       <label class="btn file-btn" id="importLabel">从本地导入音频
-        <input type="file" id="importFile" accept="audio/*">
+        <input type="file" id="importFile">
       </label>
       <label class="mode"><input type="radio" name="importMode" id="modeAssign" value="assign" checked> 整段分配到垫子</label>
       <label class="mode"><input type="radio" name="importMode" id="modeSlice" value="slice"> 切片一首音频</label>
@@ -964,7 +964,7 @@ function buildGrid(){
     grid.appendChild(el); p.el=el;
     const tr=document.createElement("tr");
     tr.innerHTML=`<td><b>${p.key}</b> ${p.name}</td><td class="fn"><code>samples/${p.file}</code></td><td class="st"></td>
-      <td><label class="file">本地文件<input type="file" accept="audio/*"></label></td><td><button>还原</button></td>`;
+      <td><label class="file">本地文件<input type="file"></label></td><td><button>还原</button></td>`;
     tr.querySelector("input").addEventListener("change",e=>{ const f=e.target.files[0]; if(f) loadLocalFile(p,f); e.target.value=""; });
     tr.querySelector("button").addEventListener("click",()=>{ p.buffer=null; p.source="synth"; refreshPad(p); });
     tbl.appendChild(tr); p.row=tr; refreshPad(p);
