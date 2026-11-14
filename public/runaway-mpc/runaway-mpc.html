@@ -70,6 +70,10 @@
   .help{font-size:13px;color:#bfc1c5;line-height:1.7}
   .help kbd{background:#2b2d31;border-radius:4px;padding:0 5px;font-size:12px}
   @media (max-width:520px){ .mpc{padding:12px} .grid{gap:8px;padding:10px} .brand{min-width:0;flex-direction:row;align-items:baseline;gap:10px;width:100%} .ctl input[type=range]{width:74px} .samples .fn{display:none} }
+  .gate{margin:0 0 12px;padding:10px 12px;background:#3a1f16;border:1px solid #8a3b2a;border-radius:8px;color:#f3d2c8;font-size:13px;line-height:1.5}
+  .gate.hidden{display:none}
+  .gate button{display:block;width:100%;margin:0 0 6px;padding:12px 10px;border:0;border-radius:8px;background:#d83a2e;color:#fff;font-weight:800;font-size:16px;letter-spacing:.06em;cursor:pointer}
+
 </style>
 </head>
 <body>
@@ -84,6 +88,10 @@
     </div>
   </div>
 
+  <div class="gate" id="audioGate">
+    <button type="button" id="btnUnlock">点击开启声音</button>
+    手机上第一次需要点这里（或点任意垫子）才会出声。若仍然静音，请关掉静音开关，把音量滑到右边，或打开下方的全屏页再试。
+  </div>
   <div class="transport">
     <button class="btn" id="btnDrums" title="快捷键：空格">进鼓 ▶</button>
     <button class="btn" id="btnDemo" title="快捷键：P">示范前奏</button>
@@ -147,23 +155,45 @@ const PAD = name => PADS.find(p=>p.file===name);
 
 // ---------- Audio graph ----------
 let ctx=null, master, comp, dry, revSend, convolver, revReturn, noiseBuf;
+function hideGate(){ const g=$("audioGate"); if(g) g.classList.add("hidden"); }
+function showGate(){ const g=$("audioGate"); if(g) g.classList.remove("hidden"); }
+function unlockTick(){
+  try{
+    const b=ctx.createBuffer(1, 1, ctx.sampleRate || 44100);
+    const s=ctx.createBufferSource(); s.buffer=b; s.connect(ctx.destination); s.start(0);
+  }catch(e){}
+}
 function ensureAudio(){
-  if(ctx){ if(ctx.state!=="running") ctx.resume(); return ctx; }
-  const AC = window.AudioContext || window.webkitAudioContext;
-  ctx = new AC({latencyHint:"interactive"});
-  master = ctx.createGain(); master.gain.value = +$("vol").value;
-  comp = ctx.createDynamicsCompressor();
-  comp.threshold.value=-14; comp.knee.value=10; comp.ratio.value=4; comp.attack.value=0.004; comp.release.value=0.18;
-  dry = ctx.createGain(); dry.gain.value = 1;
-  revSend = ctx.createGain(); revSend.gain.value = 1;
-  convolver = ctx.createConvolver(); convolver.buffer = makeImpulse(2.8, 2.6);
-  revReturn = ctx.createGain(); revReturn.gain.value = +$("rev").value;
-  dry.connect(comp); revSend.connect(convolver); convolver.connect(revReturn); revReturn.connect(comp);
-  comp.connect(master); master.connect(ctx.destination);
-  noiseBuf = makeNoise(2);
-  loadDefaultSamples();
-  setMode("就绪 READY");
-  return ctx;
+  if(!ctx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC){ setMode("此浏览器不支持 Web Audio"); return Promise.reject(new Error("no AudioContext")); }
+    try { ctx = new AC({latencyHint:"interactive"}); }
+    catch(e){ ctx = new AC(); }
+    master = ctx.createGain(); master.gain.value = +$("vol").value;
+    comp = ctx.createDynamicsCompressor();
+    comp.threshold.value=-14; comp.knee.value=10; comp.ratio.value=4; comp.attack.value=0.004; comp.release.value=0.18;
+    dry = ctx.createGain(); dry.gain.value = 1;
+    revSend = ctx.createGain(); revSend.gain.value = 1;
+    convolver = ctx.createConvolver(); convolver.buffer = makeImpulse(2.8, 2.6);
+    revReturn = ctx.createGain(); revReturn.gain.value = +$("rev").value;
+    dry.connect(comp); revSend.connect(convolver); convolver.connect(revReturn); revReturn.connect(comp);
+    comp.connect(master); master.connect(ctx.destination);
+    noiseBuf = makeNoise(2);
+    loadDefaultSamples();
+  }
+  if(ctx.state==="running"){ hideGate(); return Promise.resolve(ctx); }
+  setMode("正在开启声音…");
+  unlockTick();
+  return ctx.resume().then(()=>{
+    if(ctx.state!=="running") throw new Error("audio still "+ctx.state);
+    hideGate();
+    setMode("就绪 READY");
+    return ctx;
+  }).catch(err=>{
+    showGate();
+    setMode("没声音：请再点「开启声音」");
+    throw err;
+  });
 }
 function makeImpulse(seconds, decay){
   const len = Math.floor(ctx.sampleRate*seconds), b = ctx.createBuffer(2,len,ctx.sampleRate);
@@ -350,10 +380,15 @@ async function loadLocalFile(p,file){
 
 // ---------- Trigger ----------
 function trigger(p,t=null,visual=true){
-  ensureAudio();
-  const when = t==null ? ctx.currentTime+0.005 : t;
-  if(p.buffer) playBuffer(p,when); else p.play(when);
-  if(visual) flash(p, when);
+  const go=()=>{
+    if(!ctx) return;
+    const when = t==null ? ctx.currentTime+0.005 : t;
+    if(p.buffer) playBuffer(p,when); else p.play(when);
+    if(visual) flash(p, when);
+  };
+  const r=ensureAudio();
+  if(r && typeof r.then==="function") r.then(go).catch(()=>{});
+  else go();
 }
 function flash(p,when){
   const delay=Math.max(0,(when-ctx.currentTime)*1000);
@@ -492,8 +527,9 @@ $("btnStop").addEventListener("click",()=>{ if(running) stopTransport(); });
 $("bpm").addEventListener("change",e=>{ bpm=Math.min(180,Math.max(50,+e.target.value||87)); e.target.value=bpm; $("lcdBpm").textContent=bpm; });
 $("vol").addEventListener("input",e=>{ if(master) master.gain.setTargetAtTime(+e.target.value,ctx.currentTime,0.02); });
 $("rev").addEventListener("input",e=>{ if(revReturn) revReturn.gain.setTargetAtTime(+e.target.value,ctx.currentTime,0.02); });
-// unlock audio on first gesture (iOS/Android)
-["pointerdown","touchstart","keydown"].forEach(ev=>window.addEventListener(ev,()=>ensureAudio(),{once:true,passive:true}));
+$("btnUnlock").addEventListener("click",e=>{ e.preventDefault(); ensureAudio().then(()=>{ trigger(PAD("piano-e.wav")); }).catch(()=>{}); });
+// iOS / 应用内浏览器：每次手势都尝试 resume，避免第一次创建后停在 suspended
+["pointerdown","touchstart","keydown"].forEach(ev=>window.addEventListener(ev,()=>{ if(!ctx || ctx.state!=="running") ensureAudio(); },{passive:true}));
 window.addEventListener("keydown",e=>{
   if(e.target.closest && e.target.closest("input,textarea,select")) return;
   if(e.metaKey||e.ctrlKey||e.altKey) return;
