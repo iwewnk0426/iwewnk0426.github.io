@@ -120,6 +120,7 @@
     <button class="btn" id="btnMetro" title="快捷键：M">节拍器</button>
     <button class="btn" id="btnStop" title="快捷键：Esc">全部停止</button>
     <button class="btn" id="btnBacking" title="打开后，在垫子 1（E6）上敲满 15 下，第 16 拍起自动接上后面的伴奏">敲完 15 声自动接伴奏 <span id="backingCount">关</span></button>
+    <button class="btn on" id="btnDrumTrig" title="开着时，按「进鼓第 1 拍」垫子（F）就从进鼓那一拍（第 15 小节第 1 拍）起自动放完后面整首；人声 Look at ya 留给你敲 Z">按『进鼓第 1 拍』(F) 后面自动接 <span id="drumTrigState">开</span></button>
     <button class="btn" id="btnBackingStop" title="停止伴奏并把计数清零（快捷键：Esc）">停止伴奏</button>
     <label class="ctl">BPM <input type="number" id="bpm" min="50" max="180" step="0.1" value="87"></label>
     <label class="ctl">音量 <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8"></label>
@@ -164,7 +165,7 @@
     </div>
     <div id="stemList" class="stems"></div>
     <div class="hint" id="backingNote" hidden></div>
-    <div class="hint" id="presetInfo">「Runaway 预设切点」只用于你自己导入的 Runaway（按 5:50 版本、87 BPM 分析）：高音 E / D# / C#、低八度音、E · D#m · C#m · A 四个整小节、底鼓、军鼓、进鼓第 1 拍和 “Look at ya”。「自动切」会先测速度，再把切点吸附到拍子上，长度取整拍。「敲完 15 声自动接伴奏」：在垫子 1 上敲满 15 下 E6，从第 16 个音（低八度 E5）起自动接上你本地音频的后半段；导入了分轨时，文件名含 vocal / vox / 人声 的分轨会静音，留给你自己敲 Z（Look at ya）。分轨只在本次打开页面时有效，不会保存或上传。</div>
+    <div class="hint" id="presetInfo">「Runaway 预设切点」只用于你自己导入的 Runaway（按 5:50 版本、87 BPM 分析）：高音 E / D# / C#、低八度音、E · D#m · C#m · A 四个整小节、底鼓、军鼓、进鼓第 1 拍和 “Look at ya”。「自动切」会先测速度，再把切点吸附到拍子上，长度取整拍。「敲完 15 声自动接伴奏」：在垫子 1 上敲满 15 下 E6，从第 16 个音（低八度 E5）起自动接上你本地音频的后半段；导入了分轨时，文件名含 vocal / vox / 人声 的分轨会静音，留给你自己敲 Z（Look at ya）。「按『进鼓第 1 拍』(F) 后面自动接」：按下垫子 F 的那一下就是第 15 小节第 1 拍，后面整首自动放到结尾（分轨模式不放人声，留给你敲 Z）。分轨只在本次打开页面时有效，不会保存或上传。</div>
     <div class="row">
       <button type="button" class="btn" id="btnRestorePad">恢复合成音</button>
       <button type="button" class="btn" id="btnRestoreAll">全部恢复</button>
@@ -1058,8 +1059,8 @@ function stopBacking(resetCount=true){
   if(resetCount) backingCount=0;
   updateBackingUI(); updateButtons();
 }
-function playBackingAt(when){
-  const B=60/PRESET.bpm, resumeT=PRESET.beat0+BACKING.resumeBeat*B;
+function playBackingAt(when, resumeBeat=BACKING.resumeBeat){
+  const B=60/PRESET.bpm, resumeT=PRESET.beat0+resumeBeat*B;
   let buf=null, pos=0, kind, note="", sources=[], muted=[], offset=0;
   if(stemsBacking){
     offset=+$("presetOffset").value||0;
@@ -1075,21 +1076,23 @@ function playBackingAt(when){
   const lead=Math.min(0.015,pos); // start a hair early so the E5 attack is not clipped
   const src=ctx.createBufferSource(); src.buffer=buf;
   const g=ctx.createGain(); g.gain.value=0.9; src.connect(g); g.connect(dry);
-  src.start(Math.max(ctx.currentTime, when-lead), Math.min(pos-lead, Math.max(0,buf.duration-0.01)));
+  const startAt=Math.max(ctx.currentTime, when-lead), from=pos-(when-startAt); // keep `pos` exactly at `when`
+  src.start(startAt, Math.max(0, Math.min(from, buf.duration-0.01)));
   src.onended=()=>{ backingSources=backingSources.filter(s=>s!==src); if(!backingSources.length && backingInfo && backingInfo.kind!=="synth"){ backingInfo.playing=false; updateBackingUI(); } };
   backingSources.push(src);
   setBackingNote(note);
-  return {kind, when, pos, offset, sources, muted, playing:true, endsAt:Math.max(ctx.currentTime, when-lead)+(buf.duration-(pos-lead)), bufDur:buf.duration};
+  return {kind, when, pos, offset, sources, muted, playing:true, endsAt:startAt+(buf.duration-from), bufDur:buf.duration};
 }
-function playSynthBackingAt(when){
-  // synth fallback: the demo from the 16th intro note (bar 8, beat 4) onward, including the drum entry
+function playSynthBackingAt(when, from=7*SPB+12){
+  // synth fallback: the arrangement from the 16th intro note (bar 8, beat 4) — or from the drum entry (bar 15) — to the end
   if(running) stopTransport();
-  const full=buildArrangement(), from=7*SPB+12;
+  const full=buildArrangement();
   const d={events:full.events.filter(e=>e.step>=from).map(e=>({step:e.step-from, fn:e.fn})), len:full.len-from, drumsAt:full.drumsAt-from, start:0, arranged:true};
   demo=d; drumsStartStep=d.drumsAt; drumsStopStep=full.drumsStopAt-from; loopBass=false;
   running=true; step=0; nextTime=Math.max(ctx.currentTime+0.02, when);
   timer=setInterval(tick,LOOKAHEAD); tick();
-  setBackingNote("没有导入音频，接的是合成伴奏：第 8 小节第 4 拍起接前奏，第 15 小节鼓和贝斯进来，之后按原曲结构一路放到结尾（约 5:48，第 127 小节）。");
+  setBackingNote(from>=DRUM_ENTRY.bar0*SPB ? "没有导入音频，接的是合成伴奏：你按的这一下就是第 15 小节第 1 拍，鼓、贝斯、和弦从这里进来，按原曲结构一路放到结尾（约 5:48，第 127 小节）。"
+    : "没有导入音频，接的是合成伴奏：第 8 小节第 4 拍起接前奏，第 15 小节鼓和贝斯进来，之后按原曲结构一路放到结尾（约 5:48，第 127 小节）。");
   return {kind:"synth", when:nextTime, playing:true};
 }
 function backingHit(p){
@@ -1104,6 +1107,32 @@ function backingHit(p){
     setMode(backingInfo.kind==="synth" ? "接上合成示范 ▶" : "接上伴奏 ▶（Esc 停止）");
   }else setMode("E6 "+backingCount+"/"+BACKING.hits);
   updateBackingUI(); updateButtons();
+}
+// ---------- 按「进鼓第 1 拍」后面自动接 ----------
+// The tap IS bar 15 beat 1 (beat 55, ~38.76 s): the backing starts right there and its own first hit
+// replaces the pad sound (no double hit). While a backing is already playing the tap is just a normal pad hit.
+const DRUM_ENTRY={ pad:11, beat:55, bar0:14 };
+let drumTrigOn=true, drumTrigCount=0;
+function backingLive(){ return backingSources.length>0 || !!(backingInfo && backingInfo.kind==="synth" && demo && running); }
+function drumEntryHit(p){
+  if(!drumTrigOn || p.idx!==DRUM_ENTRY.pad || backingLive()) return false;
+  const go=()=>{
+    if(backingLive()) return;
+    const when=ctx.currentTime+0.005;
+    backingCount=0;                       // the 15-tap count (if armed) is handed over to this start
+    backingInfo=playBackingAt(when, DRUM_ENTRY.beat) || playSynthBackingAt(when, DRUM_ENTRY.bar0*SPB);
+    backingInfo.from="drum"; drumTrigCount++;
+    flash(p, when);
+    setMode(backingInfo.kind==="synth" ? "进鼓 ▶ 合成伴奏放到结尾（Esc 停止）" : "进鼓 ▶ 伴奏放到结尾（Esc 停止）");
+    updateBackingUI(); updateButtons();
+  };
+  const r=ensureAudio();
+  if(r && typeof r.then==="function") r.then(go).catch(()=>{}); else go();
+  return true;
+}
+function toggleDrumTrig(){
+  drumTrigOn=!drumTrigOn;
+  $("btnDrumTrig").classList.toggle("on",drumTrigOn); $("drumTrigState").textContent=drumTrigOn?"开":"关";
 }
 function toggleBacking(){
   ensureAudio().catch(()=>{});
@@ -1362,6 +1391,7 @@ function trigger(p,t=null,visual=true){
   const go=()=>{
     if(!ctx) return;
     const when = t==null ? ctx.currentTime+0.005 : t;
+    p.hits=(p.hits||0)+1;
     if(p.buffer) playBuffer(p,when); else p.play(when);
     if(visual) flash(p, when);
   };
@@ -1518,7 +1548,7 @@ function buildGrid(){
     const el=document.createElement("div");
     el.className="pad g-"+p.group; el.setAttribute("role","button"); el.setAttribute("aria-label",p.name);
     el.innerHTML=`<span class="k">${p.key}</span><span class="src"></span><div class="n">${p.name}</div><div class="d">${p.desc}</div>`;
-    el.addEventListener("pointerdown",e=>{ e.preventDefault(); selectPad(p); trigger(p); backingHit(p); });
+    el.addEventListener("pointerdown",e=>{ e.preventDefault(); selectPad(p); if(!drumEntryHit(p)){ trigger(p); backingHit(p); } });
     el.addEventListener("contextmenu",e=>e.preventDefault());
     grid.appendChild(el); p.el=el;
     const tr=document.createElement("tr");
@@ -1565,6 +1595,7 @@ window.__mpc={
     let on=a; while(on<d.length && Math.abs(d[on])<pk*0.2) on++;
     let z=0; const w=Math.min(d.length, on+Math.round(sr*0.25)); for(let j=on+1;j<w;j++) if((d[j-1]<0)!==(d[j]<0)) z++;
     return {dur:+(p.buffer.duration).toFixed(3), sliceLen:p.sliceLen, onsetMs:+((on-a)/sr*1000).toFixed(1), zcHz:Math.round(z/2/((w-on)/sr)), label:p.label&&p.label.name, source:p.source}; },
+  drumTrig(){ return {on:drumTrigOn, starts:drumTrigCount, live:backingLive(), from:backingInfo&&backingInfo.from, kind:backingInfo&&backingInfo.kind, sources:backingSources.length, fHits:PADS[11].hits||0, zHits:PADS[12].hits||0, endsAt:backingInfo&&backingInfo.endsAt, pos:backingInfo&&backingInfo.pos}; },
   transport(){ return {running, step, drumsOn, demoRel:demo?step-demo.start:null, demoLen:demo?demo.len:null, drumsStopStep, now:ctx&&ctx.currentTime, nextTime}; },
   backing(){ return backingInfo ? Object.assign({}, backingInfo, {count:backingCount, armed:backingArmed, live:backingSources.length, now:ctx&&ctx.currentTime, demoActive:!!demo, note:$("backingNote").textContent}) : {count:backingCount, armed:backingArmed}; },
   bpm(){ return bpm; },
@@ -1575,6 +1606,7 @@ $("btnMetro").addEventListener("click",toggleMetro);
 $("btnDemo").addEventListener("click",toggleDemo);
 $("btnStop").addEventListener("click",()=>{ stopBacking(true); if(running) stopTransport(); });
 $("btnBacking").addEventListener("click",toggleBacking);
+$("btnDrumTrig").addEventListener("click",toggleDrumTrig);
 $("btnBackingStop").addEventListener("click",()=>{ stopBacking(true); if(running) stopTransport(); setMode("伴奏已停，计数清零"); });
 $("stemsFile").addEventListener("change",e=>{ const fs=[...(e.target.files||[])]; if(fs.length) ingestStems(fs); e.target.value=""; });
 $("bpm").addEventListener("change",e=>{ bpm=Math.min(180,Math.max(50,+e.target.value||87)); e.target.value=bpm; $("lcdBpm").textContent=bpm; });
@@ -1587,7 +1619,7 @@ window.addEventListener("keydown",e=>{
   if(e.target.closest && e.target.closest("input,textarea,select")) return;
   if(e.metaKey||e.ctrlKey||e.altKey) return;
   const p=byCode[e.code];
-  if(p){ e.preventDefault(); if(!e.repeat){ trigger(p); backingHit(p); } return; }
+  if(p){ e.preventDefault(); if(!e.repeat && !drumEntryHit(p)){ trigger(p); backingHit(p); } return; }
   if(e.repeat) return;
   if(e.code==="Space"){ e.preventDefault(); toggleDrums(); }
   else if(e.code==="KeyP") toggleDemo();
