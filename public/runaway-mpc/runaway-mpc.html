@@ -80,6 +80,10 @@
   .file-btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(180deg,#5a5d66,#2e3034)}
   .file-btn input[type=file]{position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:24px}
   .btn.nud{padding:8px 10px;min-width:48px}
+  .stems .stem{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:12.5px;color:#c8c9cc}
+  .stems .sn{max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#eee}
+  .stems select{background:#111;color:#e6e6e6;border:1px solid #444;border-radius:6px;padding:4px 6px;font-size:12.5px}
+  .stems .ss{color:var(--muted)}
   .btn.preset-btn{background:linear-gradient(180deg,#7a5a1e,#4a3510);color:#ffe7a8}
   .pad .src.local{color:#ffd24a}
   .pad.editing{outline:2px solid var(--lcd);outline-offset:1px}
@@ -115,6 +119,8 @@
     <button class="btn" id="btnDemo" title="快捷键：P">示范前奏</button>
     <button class="btn" id="btnMetro" title="快捷键：M">节拍器</button>
     <button class="btn" id="btnStop" title="快捷键：Esc">全部停止</button>
+    <button class="btn" id="btnBacking" title="打开后，在垫子 1（E6）上敲满 15 下，第 16 拍起自动接上后面的伴奏">敲完 15 声自动接伴奏 <span id="backingCount">关</span></button>
+    <button class="btn" id="btnBackingStop" title="停止伴奏并把计数清零（快捷键：Esc）">停止伴奏</button>
     <label class="ctl">BPM <input type="number" id="bpm" min="50" max="180" step="0.1" value="87"></label>
     <label class="ctl">音量 <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8"></label>
     <label class="ctl">混响 <input type="range" id="rev" min="0" max="1" step="0.01" value="0.35"></label>
@@ -150,7 +156,15 @@
       <button type="button" class="btn nud" id="presetOffM" title="预设整体提前 0.02 秒">−0.02</button>
       <button type="button" class="btn nud" id="presetOffP" title="预设整体推后 0.02 秒">+0.02</button>
     </div>
-    <div class="hint" id="presetInfo">「Runaway 预设切点」只用于你自己导入的 Runaway（按 5:50 版本、87 BPM 分析）：高音 E / D# / C#、低八度音、E · D#m · C#m · A 四个整小节、底鼓、军鼓、进鼓重拍和 “Look at ya”。「自动切」会先测速度，再把切点吸附到拍子上，长度取整拍。</div>
+    <div class="row">
+      <label class="btn file-btn" id="stemsLabel">导入分轨（可多选）
+        <input type="file" id="stemsFile" multiple>
+      </label>
+      <span class="ctl" id="stemsInfo">未导入分轨 · 文件名含 piano / drums / bass / vocal / other / mix（或 钢琴 / 鼓 / 贝斯 / 人声 / 伴奏）会自动识别</span>
+    </div>
+    <div id="stemList" class="stems"></div>
+    <div class="hint" id="backingNote" hidden></div>
+    <div class="hint" id="presetInfo">「Runaway 预设切点」只用于你自己导入的 Runaway（按 5:50 版本、87 BPM 分析）：高音 E / D# / C#、低八度音、E · D#m · C#m · A 四个整小节、底鼓、军鼓、进鼓第 1 拍和 “Look at ya”。「自动切」会先测速度，再把切点吸附到拍子上，长度取整拍。「敲完 15 声自动接伴奏」：在垫子 1 上敲满 15 下 E6，从第 16 个音（低八度 E5）起自动接上你本地音频的后半段；导入了分轨时，文件名含 vocal / vox / 人声 的分轨会静音，留给你自己敲 Z（Look at ya）。分轨只在本次打开页面时有效，不会保存或上传。</div>
     <div class="row">
       <button type="button" class="btn" id="btnRestorePad">恢复合成音</button>
       <button type="button" class="btn" id="btnRestoreAll">全部恢复</button>
@@ -795,7 +809,7 @@ const PRESET={
     {beat:285.5, beats:0.5, name:"Kick",       desc:"底鼓",            drum:true},
     {beat:136,   beats:0.5, name:"Snare",      desc:"军鼓",            drum:true, pre:0.025},
     {beat:38,    beats:2,   name:"D#5 低",     desc:"低八度 D#",       midi:75},
-    {beat:55,    beats:2,   name:"进鼓重拍",   desc:"鼓进来的第 1 拍", pre:0.025},
+    {beat:55,    beats:2,   name:"进鼓第 1 拍", desc:"鼓进来的第 1 拍", pre:0.025},
     {beat:230.5, beats:1,   name:"Look at ya", desc:"人声 · 1 拍"},
     {beat:46,    beats:2,   name:"C#5 低",     desc:"低八度 C#",       midi:73},
     {beat:48,    beats:2,   name:"A5",         desc:"前奏 A",          midi:81},
@@ -840,7 +854,7 @@ function applyPreset(opts={}){
 }
 function nudgePreset(d){
   const el=$("presetOffset"); el.value=((+el.value||0)+d).toFixed(2);
-  if(presetState) applyPreset({force:true});
+  if(stemSession) scheduleStemRerun(); else if(presetState) applyPreset({force:true});
 }
 
 async function ingestFile(file, mode){
@@ -914,6 +928,8 @@ async function persistLocal(){
       const raw=fileCache.get(k);
       if(raw) files.put({ab:raw, name:(sharedSong && sharedSong.fileKey===k && sharedSong.name) || (PADS.find(p=>p.fileKey===k)||{}).localName || ""}, k);
     }
+    try{ const all=await new Promise((res,rej)=>{ const r=files.getAllKeys(); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+      for(const k of all) if(!keys.has(k)) files.delete(k); }catch(e){}
     meta.put({pads:padRecs, songKey:sharedSong && sharedSong.fileKey, songName:sharedSong && sharedSong.name}, "state");
     await new Promise((res,rej)=>{ tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
   }catch(e){ idbAvailable=false; showIdbHint("当前浏览器不能在本地记住音频，刷新后需要重新导入。"); }
@@ -997,7 +1013,7 @@ function initImportUI(){
   $("btnPreview").addEventListener("click", previewSlice);
   $("btnAutoSlice").addEventListener("click", autoSliceAll);
   $("btnPreset").addEventListener("click",()=>{ ensureAudio().catch(()=>{}); applyPreset(); });
-  $("presetOffset").addEventListener("change",()=>{ if(presetState) applyPreset({force:true}); });
+  $("presetOffset").addEventListener("change",()=>{ if(stemSession) scheduleStemRerun(); else if(presetState) applyPreset({force:true}); });
   $("presetOffM").addEventListener("click",()=>nudgePreset(-0.02));
   $("presetOffP").addEventListener("click",()=>nudgePreset(0.02));
   $("btnRestorePad").addEventListener("click",()=>{
@@ -1015,6 +1031,331 @@ function initImportUI(){
   announceSavedLocal();
 }
 
+
+
+// ---------- 敲完 15 声自动接伴奏 (local audio only) ----------
+const BACKING={ hits:15, resumeBeat:30 };   // 16th intro note (E5) = beat 30 in the analysed timeline
+let backingArmed=false, backingCount=0, backingSources=[], backingInfo=null, stemsBacking=null;
+function updateBackingUI(){
+  const b=$("btnBacking"); if(!b) return;
+  b.classList.toggle("on", backingArmed);
+  b.classList.toggle("pending", backingSources.length>0 || (backingInfo && backingInfo.kind==="synth" && !!demo));
+  $("backingCount").textContent = !backingArmed ? "关" : (backingInfo && backingInfo.playing) ? "伴奏中" : backingCount+"/"+BACKING.hits;
+}
+function setBackingNote(t){ const el=$("backingNote"); if(!el) return; el.hidden=!t; el.textContent=t||""; }
+function backingOffset(){
+  if(presetState) return presetState.auto+presetState.manual;
+  const manual=+$("presetOffset").value||0;
+  let auto=0;
+  if(sharedSong && sharedSong.buffer && PRESET.refFirstSound!=null){ const d=firstSoundTime(sharedSong.buffer)-PRESET.refFirstSound; if(Math.abs(d)<=0.5) auto=d; }
+  return auto+manual;
+}
+function stopBacking(resetCount=true){
+  backingSources.forEach(s=>{ try{ s.stop(); }catch(e){} });
+  backingSources=[];
+  if(backingInfo && backingInfo.kind==="synth" && demo){ demo=null; drumsStartStep=-1; }
+  if(backingInfo) backingInfo.playing=false;
+  if(resetCount) backingCount=0;
+  updateBackingUI(); updateButtons();
+}
+function playBackingAt(when){
+  const B=60/PRESET.bpm, resumeT=PRESET.beat0+BACKING.resumeBeat*B;
+  let buf=null, pos=0, kind, note="", sources=[], muted=[], offset=0;
+  if(stemsBacking){
+    offset=+$("presetOffset").value||0;
+    buf=stemsBacking.buffer; pos=resumeT-stemsBacking.t0+offset; kind=stemsBacking.kind; note=stemsBacking.note;
+    sources=stemsBacking.sources; muted=stemsBacking.muted;
+  }else if(sharedSong && sharedSong.buffer){
+    offset=backingOffset(); buf=sharedSong.buffer; pos=resumeT+offset; kind="mix"; sources=[sharedSong.name];
+    note="现在放的是完整混音，里面的 “Look at ya” 人声去不干净；想只留伴奏，请用「导入分轨」导入去掉人声的分轨（例如 drums / bass / piano）。";
+    if(Math.abs(buf.duration-PRESET.refDur)>PRESET.tolerance) note+=" 注意：你的版本时长和录音室版不同，接上的位置可能不准，可用「整体偏移」微调。";
+  }
+  if(!buf) return null;
+  pos=Math.max(0,pos);
+  const lead=Math.min(0.015,pos); // start a hair early so the E5 attack is not clipped
+  const src=ctx.createBufferSource(); src.buffer=buf;
+  const g=ctx.createGain(); g.gain.value=0.9; src.connect(g); g.connect(dry);
+  src.start(Math.max(ctx.currentTime, when-lead), Math.min(pos-lead, Math.max(0,buf.duration-0.01)));
+  src.onended=()=>{ backingSources=backingSources.filter(s=>s!==src); if(!backingSources.length && backingInfo && backingInfo.kind!=="synth"){ backingInfo.playing=false; updateBackingUI(); } };
+  backingSources.push(src);
+  setBackingNote(note);
+  return {kind, when, pos, offset, sources, muted, playing:true};
+}
+function playSynthBackingAt(when){
+  // synth fallback: the demo from the 16th intro note (bar 8, beat 4) onward, including the drum entry
+  if(running) stopTransport();
+  const full=buildDemo(), from=7*SPB+12;
+  const d={events:full.events.filter(e=>e.step>=from).map(e=>({step:e.step-from, fn:e.fn})), len:full.len-from, drumsAt:full.drumsAt-from, start:0};
+  demo=d; drumsStartStep=d.drumsAt;
+  running=true; step=0; nextTime=Math.max(ctx.currentTime+0.02, when);
+  timer=setInterval(tick,LOOKAHEAD); tick();
+  setBackingNote("没有导入音频，接的是合成示范（第 8 小节第 4 拍起，第 15 小节鼓和贝斯直接进来）。");
+  return {kind:"synth", when:nextTime, playing:true};
+}
+function backingHit(p){
+  if(!backingArmed || p.idx!==0 || !ctx) return;
+  if(backingInfo && backingInfo.playing) return;
+  backingCount++;
+  if(backingCount>=BACKING.hits){
+    const B=60/(sharedSong||stemsBacking ? PRESET.bpm : bpm);
+    const when=ctx.currentTime+0.005+2*B; // next 2-beat slot after the 15th tap
+    backingInfo=playBackingAt(when) || playSynthBackingAt(when);
+    backingCount=0;
+    setMode(backingInfo.kind==="synth" ? "接上合成示范 ▶" : "接上伴奏 ▶（Esc 停止）");
+  }else setMode("E6 "+backingCount+"/"+BACKING.hits);
+  updateBackingUI(); updateButtons();
+}
+function toggleBacking(){
+  ensureAudio().catch(()=>{});
+  backingArmed=!backingArmed;
+  if(!backingArmed) stopBacking(true); else { backingCount=0; setMode("在垫子 1 上敲 15 下 E6"); }
+  updateBackingUI();
+}
+
+// ---------- 一键导入分轨：识别 → 对齐 → 按预设切到各垫子 ----------
+// Each file is decoded, analysed and sliced one at a time; only small pad slices (and, for the 15-tap
+// backing, one pre-mixed buffer of the non-vocal stems from the resume point on) stay in memory.
+const ROLE_NAMES={piano:"钢琴", drums:"鼓", bass:"贝斯/808", vocal:"人声", other:"其他/伴奏", mix:"完整混音"};
+const ROLE_RE=[
+  ["vocal",/vocal|vox|voice|acapella|a cappella|人声|唱/i],
+  ["drums",/drum|kick|snare|hat|perc|鼓/i],
+  ["bass",/bass|808|贝斯/i],
+  ["piano",/piano|keys|钢琴/i],
+  ["mix",/(^|[^a-z])(mix|full|master)([^a-z]|$)|混音|完整|原曲/i],
+  ["other",/other|fx|inst|伴奏|music/i],
+];
+function roleFromName(name){ for(const [r,re] of ROLE_RE) if(re.test(name)) return r; return null; }
+function roleFromAudio(ch0, sr){
+  const first=firstSoundData(ch0,sr), N=2048, frames=120; let low=0, high=0, tot=1e-12;
+  for(let i=0;i<frames;i++){ const off=Math.floor((ch0.length-N)*(i+0.5)/frames); if(off<0) break; const m=fftMag(ch0,off,N);
+    for(let k=1;k<m.length;k++){ const f=k*sr/N, e=m[k]*m[k]; tot+=e; if(f<150) low+=e; else if(f>5000) high+=e; } }
+  const lowR=low/tot, highR=high/tot;
+  let role;
+  if(first<6) role = lowR>0.2 ? "mix" : "piano";
+  else if(first>39.6) role="vocal";
+  else if(lowR>0.55) role="bass";
+  else role="drums";
+  return {role, first, lowR, highR};
+}
+function firstSoundData(ch0, sr){
+  const win=Math.round(sr*0.01); let pk=0; for(let i=0;i<ch0.length;i++){ const v=Math.abs(ch0[i]); if(v>pk) pk=v; }
+  const thr=pk*0.05;
+  for(let i=0;i+win<ch0.length;i+=win){ let s=0; for(let j=i;j<i+win;j++) s+=ch0[j]*ch0[j]; if(Math.sqrt(s/win)>thr) return i/sr; }
+  return 0;
+}
+function onsetEnvelopeData(ch0, sr0){
+  const dec=4, sr=sr0/dec, n=Math.floor(ch0.length/dec), x=new Float32Array(n);
+  for(let i=0;i<n;i++){ const j=i*dec; x[i]=(ch0[j]+ch0[j+1]+ch0[j+2]+ch0[j+3])*0.25; }
+  const frame=1024, hop=256, nF=Math.max(0, Math.floor((n-frame)/hop)+1), env=new Float32Array(nF);
+  let prev=null;
+  for(let f=0;f<nF;f++){
+    const m=fftMag(x, f*hop, frame); for(let k=0;k<m.length;k++) m[k]=Math.log1p(m[k]*20);
+    if(prev){ let v=0; for(let k=1;k<m.length;k++){ const d=m[k]-prev[k]; if(d>0) v+=d; } env[f]=v; }
+    prev=m;
+  }
+  const w=10, hp=new Float32Array(nF); let mx=1e-9;
+  for(let i=0;i<nF;i++){ let a=0,c=0; for(let j=Math.max(0,i-w);j<=Math.min(nF-1,i+w);j++){ a+=env[j]; c++; } hp[i]=Math.max(0, env[i]-a/c); if(hp[i]>mx) mx=hp[i]; }
+  for(let i=0;i<nF;i++) hp[i]/=mx;
+  return {env:hp, fps:sr/hop, t0:(frame/2+1.5*hop)/sr};
+}
+function alignSpec(role){
+  const B=60/PRESET.bpm, bt=k=>PRESET.beat0+k*B, r=(a,b)=>{ const o=[]; for(let k=a;k<=b;k++) o.push(k); return o; };
+  if(role==="drums") return {on:r(55,118).map(bt), off:r(55,117).map(k=>bt(k+0.25)), silent:[35.6,38.5], w:[1,0.3,1]};
+  if(role==="bass") return {on:[55,63,71,79,87,95,103,111].map(bt), off:[], silent:[35.6,38.5], w:[1,0,1.5]};
+  if(role==="vocal") return {on:[41.27,45.40,52.29,57.79,159.83,165.37,170.88], off:[], silent:[35.6,40.7], w:[1,0,1]};
+  return {on:r(0,27).map(n=>bt(2*n)), off:r(0,26).map(n=>bt(2*n+1)), silent:[-1.4,0.65], w:[1,0.6,1]}; // piano / other / mix: intro notes
+}
+// Onset-envelope cross-correlation against the expected onsets, ±2 s. Returns stem time - analysed time.
+function alignStem(E, role){
+  const S=alignSpec(role), val=t=>t<0?0:envAt(E.env,(t-E.t0)*E.fps);
+  const score=lag=>{
+    let on=0; for(const t of S.on) on+=Math.max(val(t+lag-0.012),val(t+lag),val(t+lag+0.012)); on/=S.on.length;
+    let off=0; for(const t of S.off) off+=val(t+lag); off=S.off.length?off/S.off.length:0;
+    let sil=0,c=0; for(let t=S.silent[0];t<S.silent[1];t+=1/E.fps){ if(t+lag<0) continue; sil+=val(t+lag); c++; } sil=c?sil/c:0;
+    return S.w[0]*on-S.w[1]*off-S.w[2]*sil;
+  };
+  let best={s:-1e9,lag:0};
+  for(let lag=-2;lag<=2.0001;lag+=0.5/E.fps){ const s=score(lag); if(s>best.s) best={s,lag}; }
+  for(let lag=best.lag-1/E.fps;lag<=best.lag+1/E.fps;lag+=0.002){ const s=score(lag); if(s>best.s) best={s,lag}; }
+  // the flux envelope peaks a little after the true attack; per-role bias measured on separated stems
+  const bias={piano:0.015, other:0.015, mix:0.015, bass:0.03, drums:0, vocal:0}[role]||0;
+  return best.lag-bias;
+}
+// pad layout for stems (D#m bar is left out so the 808 fits; the full-mix preset keeps all four bars)
+const STEM_PADS=[
+  {idx:0,  kind:"note",  beat:0,   beats:2, name:"E6 高音 E", desc:"前奏第 1 个音", midi:88},
+  {idx:1,  kind:"note",  beat:32,  beats:2, name:"D#6", desc:"往下一级", midi:87},
+  {idx:2,  kind:"note",  beat:40,  beats:2, name:"C#6", desc:"再往下", midi:85},
+  {idx:3,  kind:"chord", beat:119, beats:4, name:"E 小节", desc:"E 和弦 · 1 小节"},
+  {idx:4,  kind:"note",  beat:30,  beats:2, name:"E5 低八度", desc:"第 16 个音", midi:76},
+  {idx:5,  kind:"chord", beat:135, beats:4, name:"C#m 小节", desc:"C#m · 1 小节"},
+  {idx:6,  kind:"chord", beat:143, beats:4, name:"A 小节", desc:"A · 1 小节"},
+  {idx:7,  kind:"808",   beat:55,  beats:2, name:"808", desc:"贝斯 E · 进鼓第 1 拍", pre:0.02},
+  {idx:8,  kind:"kick",  beat:285.5, beats:0.5, name:"Kick", desc:"底鼓", pre:0.015},
+  {idx:9,  kind:"snare", beat:136, beats:0.5, name:"Snare", desc:"军鼓", pre:0.025},
+  {idx:10, kind:"note",  beat:38,  beats:2, name:"D#5 低", desc:"低八度 D#", midi:75},
+  {idx:11, kind:"hit",   beat:55,  beats:2, name:"进鼓第 1 拍", desc:"鼓 + 贝斯", pre:0.025},
+  {idx:12, kind:"vox",   beat:230.5, beats:1, name:"Look at ya", desc:"人声 · 1 拍"},
+  {idx:13, kind:"note",  beat:46,  beats:2, name:"C#5 低", desc:"低八度 C#", midi:73},
+  {idx:14, kind:"note",  beat:48,  beats:2, name:"A5", desc:"前奏 A", midi:81},
+  {idx:15, kind:"note",  beat:52,  beats:2, name:"G#5", desc:"前奏 G#", midi:80},
+];
+const PAD_SOURCES={note:["piano","other","mix"], chord:["piano","other","mix"], "808":["bass","mix"], kick:["drums","mix"], snare:["drums","mix"], hit:["drums+bass","mix"], vox:["vocal","mix"]};
+function rmsAt(d, sr, t, len){ const a=Math.max(0,Math.round(t*sr)), b=Math.min(d.length,Math.round((t+len)*sr)); let s=0; for(let i=a;i<b;i++) s+=d[i]*d[i]; return b>a?Math.sqrt(s/(b-a)):0; }
+// cleanest isolated drum hit on the beat grid (kick: beat 1 and the "and" of 3; snare: beats 2 and 4)
+function pickDrumHit(d, sr, off, kind){
+  const B=60/PRESET.bpm, N=1024, beats=[];
+  for(let bar=0; ; bar++){ const b0=55+4*bar; if(PRESET.beat0+(b0+4)*B+off>d.length/sr-0.5) break;
+    if(kind==="kick") beats.push(b0, b0+2.5); else beats.push(b0+1, b0+3); }
+  let gpk=0; for(const b of beats) gpk=Math.max(gpk, rmsAt(d,sr,PRESET.beat0+b*B+off,0.08));
+  let best=null;
+  for(const b of beats){
+    const t=PRESET.beat0+b*B+off, i=Math.round(t*sr); if(i<N) continue;
+    const pk=rmsAt(d,sr,t,0.08), pre=rmsAt(d,sr,t-0.12,0.1), tail=rmsAt(d,sr,t+0.2,0.12);
+    const m=fftMag(d, i-64, N); let lo=0, hi=0, tot=1e-12;
+    for(let k=1;k<m.length;k++){ const f=k*sr/N, e=m[k]*m[k]; tot+=e; if(f<150) lo+=e; else if(f>1500 && f<8000) hi+=e; }
+    const band=kind==="kick"?lo/tot:hi/tot;
+    const s=band*pk/(pre+tail*0.5+0.002)*Math.min(1,pk/(0.3*gpk+1e-9));
+    if(!best||s>best.s) best={s,beat:b};
+  }
+  return best?best.beat:null;
+}
+// "Look at ya": the vocal phrase near 159.8 s or one of its repeats (2-bar grid, also half-way)
+function pickVox(d, sr, off){
+  const B=60/PRESET.bpm; let gpk=0, best=null; const cands=[];
+  for(let k=-44;k<=44;k++){ const b=230.5+4*k; const t=PRESET.beat0+b*B+off; if(t<1||t>d.length/sr-1) continue; cands.push(b); gpk=Math.max(gpk,rmsAt(d,sr,t,0.6)); }
+  for(const b of cands){
+    const t=PRESET.beat0+b*B+off, r=rmsAt(d,sr,t,0.6), pre=rmsAt(d,sr,t-0.25,0.23);
+    const s=r/(pre+0.003)*Math.min(1,r/(0.25*gpk+1e-9))*(b===230.5?1.3:1);
+    if(!best||s>best.s) best={s,beat:b};
+  }
+  return best?best.beat:230.5;
+}
+function copySlice(buf, start, len){ // small AudioBuffer copy of [start, start+len) with 3 ms fades
+  const sr=buf.sampleRate, n=Math.max(1,Math.round(len*sr)), ch=buf.numberOfChannels, out=ctx.createBuffer(ch,n,sr), a=Math.round(start*sr);
+  for(let c=0;c<ch;c++){ const s=buf.getChannelData(c), d=out.getChannelData(c);
+    for(let i=0;i<n;i++){ const j=a+i; if(j>=0&&j<s.length) d[i]=s[j]; } }
+  fadeEdges(out); return out;
+}
+function fadeEdges(b){ const f=Math.min(Math.round(b.sampleRate*0.003), b.length>>2); for(let c=0;c<b.numberOfChannels;c++){ const d=b.getChannelData(c); for(let i=0;i<f;i++){ const g=i/f; d[i]*=g; d[d.length-1-i]*=g; } } }
+function sumBuffers(list){
+  const sr=list[0].sampleRate, n=Math.max(...list.map(b=>b.length)), ch=Math.max(...list.map(b=>b.numberOfChannels)), out=ctx.createBuffer(ch,n,sr);
+  for(const b of list) for(let c=0;c<ch;c++){ const s=b.getChannelData(Math.min(c,b.numberOfChannels-1)), d=out.getChannelData(c); for(let i=0;i<s.length;i++) d[i]+=s[i]; }
+  return out;
+}
+function encodeWav(b){ // 16-bit PCM, used to keep the small slices in IndexedDB
+  const ch=b.numberOfChannels, n=b.length, sr=b.sampleRate, ab=new ArrayBuffer(44+n*ch*2), v=new DataView(ab);
+  const ws=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
+  ws(0,"RIFF"); v.setUint32(4,36+n*ch*2,true); ws(8,"WAVE"); ws(12,"fmt "); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,ch,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*ch*2,true); v.setUint16(32,ch*2,true); v.setUint16(34,16,true); ws(36,"data"); v.setUint32(40,n*ch*2,true);
+  const data=[]; for(let c=0;c<ch;c++) data.push(b.getChannelData(c));
+  let o=44; for(let i=0;i<n;i++) for(let c=0;c<ch;c++){ const x=Math.max(-1,Math.min(1,data[c][i])); v.setInt16(o, x<0?x*0x8000:x*0x7fff, true); o+=2; }
+  return ab;
+}
+let stemSession=null; // {files:[{file,name,role,roleSrc,offset,status}], busy}
+function stemRow(st,i){
+  const opts=Object.entries(ROLE_NAMES).map(([k,v])=>`<option value="${k}"${st.role===k?" selected":""}>${v}</option>`).join("");
+  const off=st.offset==null?"":" · 偏移 "+(st.offset>=0?"+":"")+st.offset.toFixed(2)+"s";
+  return `<div class="stem"><span class="sn" title="${st.name.replace(/"/g,"&quot;")}">${st.name.replace(/</g,"&lt;")}</span>`+
+    `<select data-i="${i}" ${st.role?"":"disabled"}>${st.role?opts:"<option>识别中…</option>"}</select>`+
+    `<span class="ss">${st.status}${st.roleSrc==="audio"?" · 按声音识别":""}${off}</span></div>`;
+}
+function renderStems(){
+  const el=$("stemList"); if(!el||!stemSession) return;
+  el.innerHTML=stemSession.files.map(stemRow).join("");
+  el.querySelectorAll("select").forEach(s=>s.addEventListener("change",()=>{
+    const st=stemSession.files[+s.dataset.i]; st.role=s.value; st.roleSrc="manual"; runStemPipeline();
+  }));
+  $("stemsInfo").textContent=stemSession.busy?"处理中…":"共 "+stemSession.files.length+" 条分轨（只在本机，不上传）";
+}
+async function ingestStems(files){
+  try{ await ensureAudio(); }catch(e){ return; }
+  stemSession={files:files.map(f=>({file:f, name:f.name, role:null, roleSrc:null, offset:null, status:"等待"})), busy:false};
+  renderStems();
+  await runStemPipeline();
+}
+let stemRerunTimer=null;
+function scheduleStemRerun(){ clearTimeout(stemRerunTimer); stemRerunTimer=setTimeout(()=>runStemPipeline(), 700); }
+async function runStemPipeline(){
+  if(!stemSession) return;
+  if(stemSession.busy){ stemSession.again=true; return; }
+  stemSession.busy=true; stemSession.again=false;
+  const B=60/PRESET.bpm, nudge=+$("presetOffset").value||0, sr=ctx.sampleRate;
+  const parts={};            // role -> {padIdx: AudioBuffer}
+  const voxBeat={};          // chosen beats per role
+  const RESUME_T=PRESET.beat0+BACKING.resumeBeat*B, BK_T0=RESUME_T-1.0;
+  let backing=null; const used=[], muted=[]; let mixFile=null;
+  const files=stemSession.files;
+  for(let fi=0; fi<files.length; fi++){
+    const st=files[fi];
+    try{
+      st.status="解码中 "+(fi+1)+"/"+files.length; renderStems(); await new Promise(r=>setTimeout(r,20));
+      let buf=await decodeAudio(await st.file.arrayBuffer());
+      const ch0=buf.getChannelData(0);
+      st.status="分析中"; renderStems(); await new Promise(r=>setTimeout(r,10));
+      if(!st.role || st.roleSrc==="audio"){ const nr=roleFromName(st.name); if(nr && st.roleSrc!=="manual"){ st.role=nr; st.roleSrc="name"; } else if(!st.role){ st.role=roleFromAudio(ch0,buf.sampleRate).role; st.roleSrc="audio"; } }
+      const role=st.role;
+      const E=onsetEnvelopeData(ch0, buf.sampleRate);
+      st.offset=alignStem(E, role);
+      const off=st.offset+nudge;
+      st.status="切片中"; renderStems(); await new Promise(r=>setTimeout(r,10));
+      const P=parts[role]||(parts[role]={});
+      const T=b=>PRESET.beat0+b*B+off;
+      for(const sp of STEM_PADS){
+        const srcs=PAD_SOURCES[sp.kind];
+        const fits = srcs.includes(role) || (sp.kind==="hit" && (role==="drums"||role==="bass"));
+        if(!fits) continue;
+        let beat=sp.beat;
+        if(role==="drums" && (sp.kind==="kick"||sp.kind==="snare")){ beat=pickDrumHit(ch0,buf.sampleRate,off,sp.kind); if(beat==null) continue; voxBeat[sp.kind]=beat; }
+        if(role==="vocal" && sp.kind==="vox"){ beat=pickVox(ch0,buf.sampleRate,off); voxBeat.vox=beat; }
+        const pre=sp.pre!=null?sp.pre:0.015, len=sp.beats*B-(sp.beats>=1?0.015:0.005);
+        P[sp.idx]=copySlice(buf, T(beat)-pre, len+pre);
+      }
+      if(role!=="vocal" && role!=="mix"){
+        if(!backing){ backing=ctx.createBuffer(2, Math.max(1,Math.round((PRESET.refDur+4-BK_T0)*sr)), sr); }
+        const a=Math.round((BK_T0+st.offset)*buf.sampleRate);
+        for(let c=0;c<2;c++){ const s=buf.getChannelData(Math.min(c,buf.numberOfChannels-1)), d=backing.getChannelData(c);
+          for(let i=0;i<d.length;i++){ const j=a+i; if(j>=0&&j<s.length) d[i]+=s[j]; } }
+        used.push(st.name);
+      }
+      if(role==="vocal") muted.push(st.name);
+      if(role==="mix") mixFile=st;
+      buf=null; // release the decoded stem before the next file
+      st.status="完成";
+    }catch(e){ st.status="解码失败"; }
+    renderStems();
+  }
+  if(!backing && mixFile){ // no instrument stems: fall back to the full mix for the 15-tap backing
+    try{ const buf=await decodeAudio(await mixFile.file.arrayBuffer());
+      backing=copySlice(buf, BK_T0+mixFile.offset, Math.max(1,buf.duration-(BK_T0+mixFile.offset))); used.push(mixFile.name); }catch(e){}
+  }
+  stemsBacking = backing ? {buffer:backing, t0:BK_T0, sources:used, muted, kind: mixFile&&used.length===1&&used[0]===mixFile.name?"mix":"stems",
+    note: (mixFile&&used.length===1&&used[0]===mixFile.name) ? "伴奏用的是完整混音，里面的 “Look at ya” 人声去不干净；导入 drums / bass / piano 等分轨就能只放伴奏。"
+        : "伴奏用分轨："+used.join("、")+(muted.length?"；人声分轨（"+muted.join("、")+"）已静音，Look at ya 你自己敲 Z。":"。")} : null;
+  // assign pads: pick the first available source in priority order; missing -> synth
+  const madeFrom={};
+  for(const sp of STEM_PADS){
+    const p=PADS[sp.idx]; let buf=null, from=null;
+    for(const s of PAD_SOURCES[sp.kind]){
+      if(s==="drums+bass"){ const l=[parts.drums&&parts.drums[sp.idx], parts.bass&&parts.bass[sp.idx]].filter(Boolean); if(l.length){ buf=l.length>1?sumBuffers(l):l[0]; from=l.length>1?"drums+bass":(parts.drums&&parts.drums[sp.idx]?"drums":"bass"); break; } continue; }
+      if(parts[s] && parts[s][sp.idx]){ buf=parts[s][sp.idx]; from=s; break; }
+    }
+    if(!buf){ restorePad(p); continue; }
+    const key="s-"+sp.idx+"-"+Date.now().toString(36);
+    fileCache.set(key, encodeWav(buf));
+    p.buffer=buf; p.sliceStart=0; p.sliceLen=buf.duration; p.fileKey=key; p.localName=from;
+    p.source="分轨:"+(ROLE_NAMES[from]||from); p.label={name:sp.name, desc:sp.desc+" · "+(ROLE_NAMES[from]||"鼓+贝斯")};
+    p.loopSafe=(sp.kind==="kick"||sp.kind==="snare"); p.midi=sp.midi||null;
+    madeFrom[sp.idx]=from;
+    refreshPad(p);
+  }
+  stemSession.madeFrom=madeFrom; stemSession.picked=voxBeat;
+  setBpm(PRESET.bpm); syncSliceFields(); schedulePersist();
+  stemSession.busy=false; renderStems();
+  const n=Object.keys(madeFrom).length;
+  setMode("分轨已切好 "+n+"/16 个垫子"+(n<16?"（其余保留合成音）":""));
+  if(stemSession.again) runStemPipeline();
+}
 
 // ---------- Trigger ----------
 function trigger(p,t=null,visual=true){
@@ -1041,14 +1382,18 @@ let metroOn=false, demo=null; // demo: {start, events}
 const LOOKAHEAD=25, AHEAD=0.12, SPB=16; // 16 steps per bar
 const stepDur=()=>60/bpm/4;
 
-// drum loop (1 bar, 16 steps). Measured from the song's drum part: kick on 1 and the "and" of 3,
-// snare/clap on 2 and 4, eighth-note hats. Synthesized; no recording is used.
+// drum loop: 2 bars (32 sixteenth steps), transcribed from the song's drum part right after the entry
+// (bar 15 onward; repeats every 2 bars). Values are velocities. Synthesized; no recording is used.
+//   bar A: kick 1, 3&, 3a | snare 2, 4 (+ soft drag just before 2) | hat on every "&"
+//   bar B: kick 1, 1&, 3& | snare 2, 4                              | hat on the "&" of 4 only
+// Bass: one sustained note per 2 bars following the cycle E - D# - C# - A.
 const LOOP = {
-  kick:  [1,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
-  snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-  hat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,1],
-  sub:   [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+  kick:  [1,0,0,0, 0,0,0,0, 0,0,.9,.6, 0,0,0,0,   1,0,.8,0, 0,0,0,0, 0,0,.9,0, 0,0,0,0],
+  snare: [0,0,0,.35, 1,0,0,0, 0,0,0,0, 1,0,0,0,   0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+  hat:   [0,0,.5,0, 0,0,.5,0, 0,0,.45,0, 0,0,.55,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,.55,0],
 };
+const BASS_CYCLE=[28,27,25,33]; // E1, D#1, C#1, A1 (2 bars each)
+let drumsPhase=0;
 function startTransport(){
   ensureAudio();
   if(running) return;
@@ -1058,7 +1403,8 @@ function startTransport(){
 function stopTransport(){
   running=false; clearInterval(timer); timer=null;
   drumsOn=false; drumsStartStep=drumsStopStep=-1; demo=null; metroOn=false;
-  updateButtons(); $("lcdPos").textContent="--.-"; setMode("停止 STOP");
+  if(backingInfo && backingInfo.kind==="synth") backingInfo.playing=false;
+  updateButtons(); updateBackingUI(); $("lcdPos").textContent="--.-"; setMode("停止 STOP");
 }
 function nextBarStep(){ return running ? (Math.floor(step/SPB)+1)*SPB : 0; }
 function anythingActive(){ return drumsOn || drumsStartStep>=0 || metroOn || demo; }
@@ -1068,21 +1414,22 @@ function tick(){
 }
 function scheduleStep(s,t){
   const i=s%SPB;
-  if(drumsStartStep>=0 && s>=drumsStartStep){ drumsOn=true; drumsStartStep=-1; uiLater(t,()=>{updateButtons();setMode("鼓组循环中 DRUMS");}); }
+  if(drumsStartStep>=0 && s>=drumsStartStep){ drumsOn=true; drumsStartStep=-1; drumsPhase=s; uiLater(t,()=>{updateButtons();setMode("鼓组循环中 DRUMS");}); }
   if(drumsStopStep>=0 && s>=drumsStopStep){ drumsOn=false; drumsStopStep=-1; uiLater(t,()=>{updateButtons();setMode("收鼓 DRUMS OFF");}); }
   if(drumsOn){
-    if(LOOP.kick[i]) trigLoop("kick.wav",t,()=>kick(t,i===0?1:0.85));
-    if(LOOP.snare[i]) trigLoop("snare.wav",t,()=>snare(t,0.95));
-    if(LOOP.hat[i]) trigLoop("hihat.wav",t,()=>hihat(t,i%4===0?0.75:0.45,i===15));
-    if(LOOP.sub[i]) trigLoop("sub-808.wav",t,()=>sub808(28,t,1.2));
+    const rel=s-drumsPhase, j=((rel%32)+32)%32, kv=LOOP.kick[j], sv=LOOP.snare[j], hv=LOOP.hat[j];
+    if(kv) trigLoop("kick.wav",t,()=>kick(t,kv));
+    if(sv) trigLoop("snare.wav",t,()=>snare(t,0.95*sv,sv>=1));
+    if(hv) trigLoop("hihat.wav",t,()=>hihat(t,hv,false));
+    if(j===0){ const root=BASS_CYCLE[Math.floor(rel/32)%4]; trigLoop("sub-808.wav",t,()=>sub808(root,t,2.6)); }
   }
   if(metroOn && i%4===0){ const o=ctx.createOscillator(), g=ctx.createGain(); o.frequency.value=i===0?1760:1175;
     env(g.gain,t,0.001,0.25,0.05); o.connect(g); g.connect(dry); o.start(t); o.stop(t+0.08); }
   if(demo){
     const rel=s-demo.start;
     if(rel>=0){ for(const ev of demo.events) if(ev.step===rel) ev.fn(t);
-      if(rel>=demo.len){ demo=null; trigger(PAD("big-hit.wav"),t); trigger(PAD("crash.wav"),t);
-        uiLater(t,()=>{updateButtons();setMode("进鼓！示范结束 · 换你来");}); } }
+      if(rel>=demo.len){ demo=null;
+        uiLater(t,()=>{updateButtons();setMode("鼓进来了 · 示范结束，换你来");}); } }
   }
   uiLater(t,()=>{ $("lcdPos").textContent=`${Math.floor(s/SPB)+1}.${Math.floor(i/4)+1}`; });
 }
@@ -1095,7 +1442,7 @@ function uiLater(t,fn){ setTimeout(fn,Math.max(0,(t-ctx.currentTime)*1000)); }
 // Demo intro, timed from the song (87 BPM): one piano note every 2 beats, on beats 2 and 4.
 //  bars 1-8  : high E6 x15, then E5 an octave lower
 //  bars 9-14 : D#6 x3 + D#5, C#6 x3 + C#5, A5 A5 G#5, E6 pickup
-//  bar 15    : drums enter on beat 1 (BIG HIT + crash), drum loop keeps going
+//  bar 15    : drums + bass come straight in on beat 1 (the song has no riser, crash or fill here)
 const INTRO_NOTES=[...Array(15).fill(88),76, 87,87,87,75, 85,85,85,73, 81,81,80,88];
 function notePlayer(midi){
   const p=PADS.find(x=>x.midi===midi && x.buffer) || PADS.find(x=>x.synthMidi===midi && !x.buffer);
@@ -1105,7 +1452,6 @@ function notePlayer(midi){
 function buildDemo(){
   const ev=[], add=(bar,beat,fn)=>ev.push({step:(bar-1)*SPB+Math.round((beat-1)*4),fn});
   INTRO_NOTES.forEach((m,i)=>{ const bar=1+Math.floor(i/2), beat=(i%2)?4:2; add(bar,beat,notePlayer(m)); });
-  add(14,1,t=>trigger(PAD("riser.wav"),t));
   return {events:ev,len:14*SPB, drumsAt:14*SPB};
 }
 // ---------- UI ----------
@@ -1143,7 +1489,7 @@ function buildGrid(){
     const el=document.createElement("div");
     el.className="pad g-"+p.group; el.setAttribute("role","button"); el.setAttribute("aria-label",p.name);
     el.innerHTML=`<span class="k">${p.key}</span><span class="src"></span><div class="n">${p.name}</div><div class="d">${p.desc}</div>`;
-    el.addEventListener("pointerdown",e=>{ e.preventDefault(); selectPad(p); trigger(p); });
+    el.addEventListener("pointerdown",e=>{ e.preventDefault(); selectPad(p); trigger(p); backingHit(p); });
     el.addEventListener("contextmenu",e=>e.preventDefault());
     grid.appendChild(el); p.el=el;
     const tr=document.createElement("tr");
@@ -1184,13 +1530,23 @@ window.__mpc={
   firstSound(){ return sharedSong ? firstSoundTime(sharedSong.buffer) : null; },
   preset(o){ return applyPreset(Object.assign({confirm:()=>false},o||{})); },
   presetTable(){ return presetSlices(0); },
+  stems(){ return stemSession ? {busy:stemSession.busy, files:stemSession.files.map(f=>({name:f.name, role:f.role, roleSrc:f.roleSrc, offset:f.offset, status:f.status})), madeFrom:stemSession.madeFrom, picked:stemSession.picked, backing:stemsBacking?{sources:stemsBacking.sources, muted:stemsBacking.muted, kind:stemsBacking.kind, dur:stemsBacking.buffer.duration}:null} : null; },
+  padProbe(i){ const p=PADS[i]; if(!p.buffer) return null; const d=p.buffer.getChannelData(0), sr=p.buffer.sampleRate, a=Math.round((p.sliceStart||0)*sr);
+    let pk=0; for(let j=a;j<d.length;j++) pk=Math.max(pk,Math.abs(d[j]));
+    let on=a; while(on<d.length && Math.abs(d[on])<pk*0.2) on++;
+    let z=0; const w=Math.min(d.length, on+Math.round(sr*0.25)); for(let j=on+1;j<w;j++) if((d[j-1]<0)!==(d[j]<0)) z++;
+    return {dur:+(p.buffer.duration).toFixed(3), sliceLen:p.sliceLen, onsetMs:+((on-a)/sr*1000).toFixed(1), zcHz:Math.round(z/2/((w-on)/sr)), label:p.label&&p.label.name, source:p.source}; },
+  backing(){ return backingInfo ? Object.assign({}, backingInfo, {count:backingCount, armed:backingArmed, live:backingSources.length, now:ctx&&ctx.currentTime, demoActive:!!demo, note:$("backingNote").textContent}) : {count:backingCount, armed:backingArmed}; },
   bpm(){ return bpm; },
   ctxState(){ return ctx?ctx.state:null; }
 };
 $("btnDrums").addEventListener("click",toggleDrums);
 $("btnMetro").addEventListener("click",toggleMetro);
 $("btnDemo").addEventListener("click",toggleDemo);
-$("btnStop").addEventListener("click",()=>{ if(running) stopTransport(); });
+$("btnStop").addEventListener("click",()=>{ stopBacking(true); if(running) stopTransport(); });
+$("btnBacking").addEventListener("click",toggleBacking);
+$("btnBackingStop").addEventListener("click",()=>{ stopBacking(true); if(running) stopTransport(); setMode("伴奏已停，计数清零"); });
+$("stemsFile").addEventListener("change",e=>{ const fs=[...(e.target.files||[])]; if(fs.length) ingestStems(fs); e.target.value=""; });
 $("bpm").addEventListener("change",e=>{ bpm=Math.min(180,Math.max(50,+e.target.value||87)); e.target.value=bpm; $("lcdBpm").textContent=bpm; });
 $("vol").addEventListener("input",e=>{ if(master) master.gain.setTargetAtTime(+e.target.value,ctx.currentTime,0.02); });
 $("rev").addEventListener("input",e=>{ if(revReturn) revReturn.gain.setTargetAtTime(+e.target.value,ctx.currentTime,0.02); });
@@ -1201,12 +1557,12 @@ window.addEventListener("keydown",e=>{
   if(e.target.closest && e.target.closest("input,textarea,select")) return;
   if(e.metaKey||e.ctrlKey||e.altKey) return;
   const p=byCode[e.code];
-  if(p){ e.preventDefault(); if(!e.repeat) trigger(p); return; }
+  if(p){ e.preventDefault(); if(!e.repeat){ trigger(p); backingHit(p); } return; }
   if(e.repeat) return;
   if(e.code==="Space"){ e.preventDefault(); toggleDrums(); }
   else if(e.code==="KeyP") toggleDemo();
   else if(e.code==="KeyM") toggleMetro();
-  else if(e.code==="Escape"){ if(running) stopTransport(); }
+  else if(e.code==="Escape"){ stopBacking(true); if(running) stopTransport(); }
 });
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden && ctx && ctx.state!=="running") ctx.resume(); });
 })();
