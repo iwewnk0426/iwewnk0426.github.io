@@ -1079,17 +1079,17 @@ function playBackingAt(when){
   src.onended=()=>{ backingSources=backingSources.filter(s=>s!==src); if(!backingSources.length && backingInfo && backingInfo.kind!=="synth"){ backingInfo.playing=false; updateBackingUI(); } };
   backingSources.push(src);
   setBackingNote(note);
-  return {kind, when, pos, offset, sources, muted, playing:true};
+  return {kind, when, pos, offset, sources, muted, playing:true, endsAt:Math.max(ctx.currentTime, when-lead)+(buf.duration-(pos-lead)), bufDur:buf.duration};
 }
 function playSynthBackingAt(when){
   // synth fallback: the demo from the 16th intro note (bar 8, beat 4) onward, including the drum entry
   if(running) stopTransport();
-  const full=buildDemo(), from=7*SPB+12;
-  const d={events:full.events.filter(e=>e.step>=from).map(e=>({step:e.step-from, fn:e.fn})), len:full.len-from, drumsAt:full.drumsAt-from, start:0};
-  demo=d; drumsStartStep=d.drumsAt;
+  const full=buildArrangement(), from=7*SPB+12;
+  const d={events:full.events.filter(e=>e.step>=from).map(e=>({step:e.step-from, fn:e.fn})), len:full.len-from, drumsAt:full.drumsAt-from, start:0, arranged:true};
+  demo=d; drumsStartStep=d.drumsAt; drumsStopStep=full.drumsStopAt-from; loopBass=false;
   running=true; step=0; nextTime=Math.max(ctx.currentTime+0.02, when);
   timer=setInterval(tick,LOOKAHEAD); tick();
-  setBackingNote("没有导入音频，接的是合成示范（第 8 小节第 4 拍起，第 15 小节鼓和贝斯直接进来）。");
+  setBackingNote("没有导入音频，接的是合成伴奏：第 8 小节第 4 拍起接前奏，第 15 小节鼓和贝斯进来，之后按原曲结构一路放到结尾（约 5:48，第 127 小节）。");
   return {kind:"synth", when:nextTime, playing:true};
 }
 function backingHit(p){
@@ -1312,7 +1312,7 @@ async function runStemPipeline(){
         P[sp.idx]=copySlice(buf, T(beat)-pre, len+pre);
       }
       if(role!=="vocal" && role!=="mix"){
-        if(!backing){ backing=ctx.createBuffer(2, Math.max(1,Math.round((PRESET.refDur+4-BK_T0)*sr)), sr); }
+        if(!backing){ backing=ctx.createBuffer(2, Math.max(1,Math.round((Math.max(PRESET.refDur+4, buf.duration-st.offset+1)-BK_T0)*sr)), sr); /* whole rest of the song, not just the intro */ }
         const a=Math.round((BK_T0+st.offset)*buf.sampleRate);
         for(let c=0;c<2;c++){ const s=buf.getChannelData(Math.min(c,buf.numberOfChannels-1)), d=backing.getChannelData(c);
           for(let i=0;i<d.length;i++){ const j=a+i; if(j>=0&&j<s.length) d[i]+=s[j]; } }
@@ -1393,7 +1393,7 @@ const LOOP = {
   hat:   [0,0,.5,0, 0,0,.5,0, 0,0,.45,0, 0,0,.55,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,.55,0],
 };
 const BASS_CYCLE=[28,27,25,33]; // E1, D#1, C#1, A1 (2 bars each)
-let drumsPhase=0;
+let drumsPhase=0, loopBass=true; // the synth arrangement schedules its own bass
 function startTransport(){
   ensureAudio();
   if(running) return;
@@ -1402,7 +1402,7 @@ function startTransport(){
 }
 function stopTransport(){
   running=false; clearInterval(timer); timer=null;
-  drumsOn=false; drumsStartStep=drumsStopStep=-1; demo=null; metroOn=false;
+  drumsOn=false; drumsStartStep=drumsStopStep=-1; demo=null; metroOn=false; loopBass=true;
   if(backingInfo && backingInfo.kind==="synth") backingInfo.playing=false;
   updateButtons(); updateBackingUI(); $("lcdPos").textContent="--.-"; setMode("停止 STOP");
 }
@@ -1421,7 +1421,7 @@ function scheduleStep(s,t){
     if(kv) trigLoop("kick.wav",t,()=>kick(t,kv));
     if(sv) trigLoop("snare.wav",t,()=>snare(t,0.95*sv,sv>=1));
     if(hv) trigLoop("hihat.wav",t,()=>hihat(t,hv,false));
-    if(j===0){ const root=BASS_CYCLE[Math.floor(rel/32)%4]; trigLoop("sub-808.wav",t,()=>sub808(root,t,2.6)); }
+    if(j===0 && loopBass){ const root=BASS_CYCLE[Math.floor(rel/32)%4]; trigLoop("sub-808.wav",t,()=>sub808(root,t,2.6)); }
   }
   if(metroOn && i%4===0){ const o=ctx.createOscillator(), g=ctx.createGain(); o.frequency.value=i===0?1760:1175;
     env(g.gain,t,0.001,0.25,0.05); o.connect(g); g.connect(dry); o.start(t); o.stop(t+0.08); }
@@ -1453,6 +1453,35 @@ function buildDemo(){
   const ev=[], add=(bar,beat,fn)=>ev.push({step:(bar-1)*SPB+Math.round((beat-1)*4),fn});
   INTRO_NOTES.forEach((m,i)=>{ const bar=1+Math.floor(i/2), beat=(i%2)?4:2; add(bar,beat,notePlayer(m)); });
   return {events:ev,len:14*SPB, drumsAt:14*SPB};
+}
+// Full synth arrangement for the 15-tap fallback: the intro, then the song's measured structure on the
+// 87 BPM grid (bar 15 = drum entry at ~38.8 s). Measured from the recording (numbers only):
+//   bars 15-62  : 8-bar cycle E - D#m - C#m - A (2 bars each), drums 2-bar pattern, bass one note per 2 bars
+//   bars 63-70  : bridge, bass moves chromatically around F / F# / G (approximate: simplified to F-F#-G per bar)
+//   bars 71-126 : the 8-bar cycle again
+//   bar 127     : end (~347.8 s); final E chord + E6
+// The piano E6 keeps sounding on beats 2 and 4 through the cycle sections, as in the recording.
+// Chord voicings and the bridge figure are approximations; vocals are never played (Look at ya is yours, pad Z).
+const ARR={ bridge:[63,70], end:127 };
+const CYCLE_CHORDS=[[40,52,56,59,64],[39,51,58,63,66],[37,49,56,61,64],[33,45,57,61,64]]; // E, D#m, C#m, A
+function buildArrangement(){
+  const base=buildDemo(), ev=base.events.slice();
+  const add=(bar,beat,fn)=>ev.push({step:(bar-1)*SPB+Math.round((beat-1)*4),fn});
+  const E6=notePlayer(88);
+  for(let bar=15; bar<ARR.end; bar++){
+    const inBridge=bar>=ARR.bridge[0] && bar<=ARR.bridge[1];
+    const rel=bar-(bar>=ARR.bridge[1]+1?ARR.bridge[1]+1:15), slot=Math.floor(rel/2)%4, first=(rel%2)===0;
+    if(inBridge){
+      [[1,29],[2,30],[3,31]].forEach(([b,m])=>add(bar,b,t=>sub808(m,t,b===3?1.9:0.65)));
+    }else if(first){
+      const root=BASS_CYCLE[slot], ch=CYCLE_CHORDS[slot];
+      add(bar,1,t=>{ sub808(root,t,2.6); pianoChord(ch,t,0.42); });
+    }
+    add(bar,2,E6); add(bar,4,E6);
+  }
+  add(ARR.end,1,t=>{ pianoChord(CYCLE_CHORDS[0],t,0.6); pianoNote(88,t,1.0,true); sub808(28,t,3.5); });
+  const endStep=(ARR.end-1)*SPB;
+  return {events:ev, len:endStep+SPB, drumsAt:base.drumsAt, drumsStopAt:endStep};
 }
 // ---------- UI ----------
 function $(id){ return document.getElementById(id); }
@@ -1536,6 +1565,7 @@ window.__mpc={
     let on=a; while(on<d.length && Math.abs(d[on])<pk*0.2) on++;
     let z=0; const w=Math.min(d.length, on+Math.round(sr*0.25)); for(let j=on+1;j<w;j++) if((d[j-1]<0)!==(d[j]<0)) z++;
     return {dur:+(p.buffer.duration).toFixed(3), sliceLen:p.sliceLen, onsetMs:+((on-a)/sr*1000).toFixed(1), zcHz:Math.round(z/2/((w-on)/sr)), label:p.label&&p.label.name, source:p.source}; },
+  transport(){ return {running, step, drumsOn, demoRel:demo?step-demo.start:null, demoLen:demo?demo.len:null, drumsStopStep, now:ctx&&ctx.currentTime, nextTime}; },
   backing(){ return backingInfo ? Object.assign({}, backingInfo, {count:backingCount, armed:backingArmed, live:backingSources.length, now:ctx&&ctx.currentTime, demoActive:!!demo, note:$("backingNote").textContent}) : {count:backingCount, armed:backingArmed}; },
   bpm(){ return bpm; },
   ctxState(){ return ctx?ctx.state:null; }
