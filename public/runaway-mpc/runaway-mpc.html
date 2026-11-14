@@ -70,6 +70,23 @@
   .help{font-size:13px;color:#bfc1c5;line-height:1.7}
   .help kbd{background:#2b2d31;border-radius:4px;padding:0 5px;font-size:12px}
   @media (max-width:520px){ .mpc{padding:12px} .grid{gap:8px;padding:10px} .brand{min-width:0;flex-direction:row;align-items:baseline;gap:10px;width:100%} .ctl input[type=range]{width:74px} .samples .fn{display:none} }
+
+  .import{margin:14px 0 0;background:#15161a;border:1px solid #2b2d31;border-radius:10px;padding:10px 12px}
+  .import .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+  .import .row:first-child{margin-top:0}
+  .import .hint{font-size:12px;color:var(--muted);line-height:1.55;margin:8px 0 0}
+  .import .mode{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:#c8c9cc;cursor:pointer;user-select:none}
+  .import select{max-width:160px;background:#111;color:#e6e6e6;border:1px solid #444;border-radius:6px;padding:7px 6px;font-size:13px}
+  .file-btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(180deg,#5a5d66,#2e3034)}
+  .file-btn input[type=file]{position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:24px}
+  .btn.nud{padding:8px 10px;min-width:48px}
+  .pad .src.local{color:#ffd24a}
+  .pad.editing{outline:2px solid var(--lcd);outline-offset:1px}
+  .pad.has-user::before{content:"";position:absolute;top:7px;right:36px;width:7px;height:7px;border-radius:50%;background:#ffd24a;box-shadow:0 0 6px #ffd24a;pointer-events:none}
+  @media (max-width:520px){
+    .import select{max-width:100%;flex:1}
+    .import .ctl input[type=number]{width:72px}
+  }
   .gate{margin:0 0 12px;padding:10px 12px;background:#3a1f16;border:1px solid #8a3b2a;border-radius:8px;color:#f3d2c8;font-size:13px;line-height:1.5}
   .gate.hidden{display:none}
   .gate button{display:block;width:100%;margin:0 0 6px;padding:12px 10px;border:0;border-radius:8px;background:#d83a2e;color:#fff;font-weight:800;font-size:16px;letter-spacing:.06em;cursor:pointer}
@@ -106,6 +123,34 @@
   <div class="legend">
     <span><i style="background:#fff"></i>钢琴单音</span><span><i style="background:#8fc1ff"></i>和弦 / 808</span>
     <span><i style="background:#ff5a3c"></i>鼓</span><span><i style="background:#ffd24a"></i>人声替身</span><span><i style="background:#c48cff"></i>效果</span>
+  </div>
+
+
+  <div class="import" id="importPanel">
+    <div class="row">
+      <label class="ctl">垫子 <select id="padSelect"></select></label>
+      <label class="btn file-btn" id="importLabel">从本地导入音频
+        <input type="file" id="importFile" accept="audio/*">
+      </label>
+      <label class="mode"><input type="radio" name="importMode" id="modeAssign" value="assign" checked> 整段分配到垫子</label>
+      <label class="mode"><input type="radio" name="importMode" id="modeSlice" value="slice"> 切片一首音频</label>
+    </div>
+    <div class="row" id="sliceRow">
+      <label class="ctl">起点（秒） <input type="number" id="sliceStart" min="0" step="0.01" value="0"></label>
+      <button type="button" class="btn nud" id="nudgeStartM" title="起点 -0.1 秒">−0.1</button>
+      <button type="button" class="btn nud" id="nudgeStartP" title="起点 +0.1 秒">+0.1</button>
+      <label class="ctl">长度（秒） <input type="number" id="sliceLen" min="0.01" step="0.01" value="1"></label>
+      <button type="button" class="btn" id="btnPreview">试听</button>
+      <button type="button" class="btn" id="btnAutoSlice">自动切</button>
+    </div>
+    <div class="row">
+      <button type="button" class="btn" id="btnRestorePad">恢复合成音</button>
+      <button type="button" class="btn" id="btnRestoreAll">全部恢复</button>
+      <button type="button" class="btn" id="btnClearLocal">清除本地音频</button>
+    </div>
+    <div class="hint" id="importInfo" hidden></div>
+    <div class="hint">导入的文件只在你这台设备上播放，不会上传。</div>
+    <div class="hint" id="idbHint" hidden></div>
   </div>
 
   <details>
@@ -149,7 +194,7 @@ const PADS = [
   {key:"C", code:"KeyC",   name:"Riser",    desc:"上升 / 反向", file:"riser.wav",     group:"fx",    play:t=>riser(t)},
   {key:"V", code:"KeyV",   name:"Crash",    desc:"镲片",        file:"crash.wav",     group:"fx",    play:t=>crash(t)},
 ];
-PADS.forEach((p,i)=>{p.idx=i; p.buffer=null; p.source="synth";});
+PADS.forEach((p,i)=>{p.idx=i; p.buffer=null; p.source="synth"; p.sliceStart=0; p.sliceLen=null; p.fileKey=null; p.localName=null;});
 const byCode = Object.fromEntries(PADS.map(p=>[p.code,p]));
 const PAD = name => PADS.find(p=>p.file===name);
 
@@ -179,7 +224,7 @@ function ensureAudio(){
     dry.connect(comp); revSend.connect(convolver); convolver.connect(revReturn); revReturn.connect(comp);
     comp.connect(master); master.connect(ctx.destination);
     noiseBuf = makeNoise(2);
-    loadDefaultSamples();
+    loadDefaultSamples().then(()=>restoreLocalAudio()).catch(()=>restoreLocalAudio());
   }
   if(ctx.state==="running"){ hideGate(); return Promise.resolve(ctx); }
   setMode("正在开启声音…");
@@ -350,7 +395,32 @@ function riser(t){
 
 // ---------- Samples ----------
 function playBuffer(p,t){
-  const s=ctx.createBufferSource(); s.buffer=p.buffer; const g=out(s,0.3,0.9); s.start(t); return g;
+  const s=ctx.createBufferSource(); s.buffer=p.buffer;
+  const g=out(s,0.3,1);
+  const off=Math.max(0, +(p.sliceStart||0));
+  const maxLen=Math.max(0, p.buffer.duration-off);
+  const dur=(p.sliceLen!=null && p.sliceLen>0)?Math.min(+p.sliceLen,maxLen):maxLen;
+  if(!(dur>0)) return g;
+  const fade=Math.min(0.008, dur/4);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(0.9,t+fade);
+  if(dur>fade*2){
+    g.gain.setValueAtTime(0.9,t+Math.max(fade, dur-fade));
+    g.gain.linearRampToValueAtTime(0.0001,t+dur);
+  }
+  s.start(t, off, dur);
+  return g;
+}
+function decodeAudio(ab){
+  return new Promise((res,rej)=>{
+    let done=false;
+    const ok=b=>{ if(!done){ done=true; res(b); } };
+    const bad=e=>{ if(!done){ done=true; rej(e||new Error("decode failed")); } };
+    try{
+      const ret=ctx.decodeAudioData(ab, ok, bad);
+      if(ret && typeof ret.then==="function") ret.then(ok,bad);
+    }catch(e){ bad(e); }
+  });
 }
 async function loadDefaultSamples(){
   if(location.protocol==="file:") return; // fetch of local files is blocked; synth fallback
@@ -372,11 +442,399 @@ async function loadDefaultSamples(){
   }
 }
 async function loadLocalFile(p,file){
-  ensureAudio();
-  try{ const ab=await file.arrayBuffer(); p.buffer=await ctx.decodeAudioData(ab); p.source="本地:"+file.name; }
-  catch(e){ alert("这个文件解码失败，换一个 wav / mp3 / m4a 试试。"); }
-  refreshPad(p);
+  try{ await ensureAudio(); }catch(e){ return; }
+  try{
+    const ab=await file.arrayBuffer();
+    const copy=ab.slice(0);
+    const buf=await decodeAudio(ab);
+    const key=newFileKey();
+    fileCache.set(key, copy);
+    assignWholeToPad(p, buf, file.name, key);
+    sharedSong={buffer:buf, name:file.name, fileKey:key, dur:buf.duration};
+    showImportInfo();
+    setMode("已整段分配到垫子 "+p.key+" · "+p.name);
+    schedulePersist();
+  }catch(e){ alert("这个文件解码失败，换一个 wav / mp3 / m4a 试试。"); }
 }
+
+// ---------- Local import, slicing, onset detect, IndexedDB ----------
+let selectedPad=PADS[0];
+let sharedSong=null;
+let persistTimer=null;
+let idbAvailable=!!window.indexedDB;
+const fileCache=new Map();
+const IDB_NAME="runaway-mpc-local", IDB_VER=1;
+
+function isUser(p){ return !!(p.source && p.source!=="synth" && p.source!=="samples/"); }
+function newFileKey(){ return "f-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8); }
+function showImportInfo(){
+  const el=$("importInfo"); if(!el) return;
+  if(!sharedSong){ el.hidden=true; return; }
+  el.hidden=false;
+  el.textContent="已导入 "+sharedSong.name+"（"+(+sharedSong.dur).toFixed(2)+" 秒）";
+}
+
+function mixMono(buf){
+  const n=buf.length, ch=buf.numberOfChannels, out=new Float32Array(n);
+  for(let c=0;c<ch;c++){ const d=buf.getChannelData(c); for(let i=0;i<n;i++) out[i]+=d[i]; }
+  if(ch>1) for(let i=0;i<n;i++) out[i]/=ch;
+  return out;
+}
+function fftMag(input, offset, n){
+  const re=new Float32Array(n), im=new Float32Array(n);
+  for(let i=0;i<n;i++){ const w=0.5-0.5*Math.cos(2*Math.PI*i/n); re[i]=(input[offset+i]||0)*w; }
+  for(let i=1,j=0;i<n;i++){
+    let bit=n>>1;
+    for(;j&bit;bit>>=1) j^=bit;
+    j^=bit;
+    if(i<j){ const tr=re[i]; re[i]=re[j]; re[j]=tr; const ti=im[i]; im[i]=im[j]; im[j]=ti; }
+  }
+  for(let len=2;len<=n;len<<=1){
+    const ang=-2*Math.PI/len, wr0=Math.cos(ang), wi0=Math.sin(ang);
+    for(let i=0;i<n;i+=len){
+      let wr=1, wi=0;
+      for(let j=0;j<len/2;j++){
+        const ur=re[i+j], ui=im[i+j];
+        const jr=re[i+j+len/2], ji=im[i+j+len/2];
+        const vr=jr*wr-ji*wi, vi=jr*wi+ji*wr;
+        re[i+j]=ur+vr; im[i+j]=ui+vi;
+        re[i+j+len/2]=ur-vr; im[i+j+len/2]=ui-vi;
+        const nwr=wr*wr0-wi*wi0; wi=wr*wi0+wi*wr0; wr=nwr;
+      }
+    }
+  }
+  const m=new Float32Array(n/2);
+  for(let k=0;k<n/2;k++) m[k]=Math.hypot(re[k],im[k]);
+  return m;
+}
+function detectOnsets(buffer){
+  const sr=buffer.sampleRate, mono=mixMono(buffer);
+  const frame=2048, hop=512;
+  const nFrames=Math.max(0, Math.floor((mono.length-frame)/hop)+1);
+  if(nFrames<3) return [];
+  const flux=new Float32Array(nFrames);
+  let prev=null;
+  for(let f=0;f<nFrames;f++){
+    const mag=fftMag(mono, f*hop, frame);
+    if(prev){ let v=0; for(let k=1;k<mag.length;k++) v+=Math.max(0, mag[k]-prev[k]); flux[f]=v; }
+    prev=mag;
+  }
+  const hp=new Float32Array(nFrames), w=8;
+  for(let i=0;i<nFrames;i++){
+    let s=0,c=0;
+    for(let j=Math.max(0,i-w);j<=Math.min(nFrames-1,i+w);j++){ s+=flux[j]; c++; }
+    hp[i]=Math.max(0, flux[i]-s/c);
+  }
+  const sorted=Array.from(hp).sort((a,b)=>a-b);
+  const med=sorted[Math.floor(sorted.length*0.5)]||0;
+  const q80=sorted[Math.floor(sorted.length*0.80)]||0;
+  const thr=Math.max(med*2.2, q80*0.9, 1e-8);
+  const minGap=Math.max(0.12, Math.min(0.35, buffer.duration/40));
+  const peaks=[];
+  for(let i=1;i<nFrames-1;i++){
+    if(hp[i]>=thr && hp[i]>=hp[i-1] && hp[i]>hp[i+1]) peaks.push({t:i*hop/sr, s:hp[i]});
+  }
+  peaks.sort((a,b)=>a.t-b.t);
+  const merged=[];
+  for(const pk of peaks){
+    const last=merged[merged.length-1];
+    if(last && pk.t-last.t<minGap){ if(pk.s>last.s) merged[merged.length-1]=pk; }
+    else merged.push(pk);
+  }
+  return merged;
+}
+function pickOnsets(onsets, duration, n){
+  const minGap=Math.max(0.12, duration/(n*2.5));
+  const ranked=onsets.slice().sort((a,b)=>b.s-a.s);
+  const picked=[];
+  for(const o of ranked){
+    if(picked.every(x=>Math.abs(x.t-o.t)>=minGap)) picked.push(o);
+    if(picked.length>=n) break;
+  }
+  picked.sort((a,b)=>a.t-b.t);
+  return picked;
+}
+function evenSlices(duration, n, cap){
+  const step=duration/n, len=Math.min(cap, Math.max(0.08, step)), out=[];
+  for(let i=0;i<n;i++){
+    const start=i*step;
+    out.push({start:+start.toFixed(4), len:+Math.min(len, Math.max(0.08, duration-start)).toFixed(4)});
+  }
+  return out;
+}
+function slicesFromOnsets(onsets, duration, n, cap){
+  const picked=pickOnsets(onsets, duration, n);
+  if(picked.length<Math.min(n,4)) return {slices:evenSlices(duration,n,cap), auto:false};
+  let times=picked.map(o=>o.t);
+  if(times[0]>0.25) times.unshift(0);
+  while(times.length<n){
+    let bestI=0, bestG=-1;
+    for(let i=0;i<times.length;i++){
+      const a=times[i], b=(i+1<times.length)?times[i+1]:duration, g=b-a;
+      if(g>bestG){ bestG=g; bestI=i; }
+    }
+    if(bestG<0.16) break;
+    const a=times[bestI], b=(bestI+1<times.length)?times[bestI+1]:duration;
+    times.splice(bestI+1, 0, (a+b)/2);
+  }
+  times=times.slice(0,n).sort((a,b)=>a-b);
+  if(times.length<n) return {slices:evenSlices(duration,n,cap), auto:false};
+  const slices=[];
+  for(let i=0;i<n;i++){
+    const start=Math.max(0, times[i]);
+    const next=(i+1<n)?times[i+1]:duration;
+    const len=Math.min(cap, Math.max(0.08, next-start), Math.max(0.08, duration-start));
+    slices.push({start:+start.toFixed(4), len:+len.toFixed(4)});
+  }
+  return {slices, auto:true};
+}
+function applySlices(slices, name, fileKey, buffer){
+  PADS.forEach((p,i)=>{
+    const sl=slices[i];
+    p.buffer=buffer; p.sliceStart=sl.start; p.sliceLen=sl.len;
+    p.source="切片:"+(name||"local"); p.fileKey=fileKey; p.localName=name;
+    refreshPad(p);
+  });
+  syncSliceFields();
+  schedulePersist();
+}
+function assignWholeToPad(p, buf, name, fileKey){
+  p.buffer=buf; p.sliceStart=0; p.sliceLen=null;
+  p.source="本地:"+name; p.fileKey=fileKey; p.localName=name;
+  refreshPad(p); selectPad(p);
+}
+function assignSliceToPad(p, start, len){
+  if(!sharedSong) return;
+  p.buffer=sharedSong.buffer; p.sliceStart=start; p.sliceLen=len;
+  p.source="切片:"+sharedSong.name; p.fileKey=sharedSong.fileKey; p.localName=sharedSong.name;
+  refreshPad(p); syncSliceFields(); schedulePersist();
+}
+function selectPad(p){
+  selectedPad=p;
+  PADS.forEach(x=>{ if(x.el) x.el.classList.toggle("editing", x===p); });
+  const sel=$("padSelect");
+  if(sel && sel.value!==String(p.idx)) sel.value=String(p.idx);
+  syncSliceFields();
+}
+function syncSliceFields(){
+  const p=selectedPad, start=$("sliceStart"), len=$("sliceLen");
+  if(!p || !start || !len) return;
+  start.value=(p.sliceStart||0).toFixed(2);
+  let def=1;
+  if(p.buffer){
+    const remain=Math.max(0.01, p.buffer.duration-(p.sliceStart||0));
+    def=(p.sliceLen!=null && p.sliceLen>0)?p.sliceLen:remain;
+    start.max=p.buffer.duration.toFixed(2);
+  }
+  len.value=(+def).toFixed(2);
+}
+function applySliceFields(){
+  const p=selectedPad; if(!p || !p.buffer) return;
+  let start=Math.max(0, +$("sliceStart").value||0);
+  start=Math.min(start, Math.max(0, p.buffer.duration-0.01));
+  let dur=Math.max(0.01, +$("sliceLen").value||0);
+  dur=Math.min(dur, Math.max(0.01, p.buffer.duration-start));
+  p.sliceStart=start; p.sliceLen=dur;
+  if(!isUser(p)) p.source="切片:local";
+  $("sliceStart").value=start.toFixed(2);
+  $("sliceLen").value=dur.toFixed(2);
+  refreshPad(p); schedulePersist();
+}
+function nudgeStart(delta){
+  const el=$("sliceStart");
+  el.value=(Math.max(0, (+el.value||0)+delta)).toFixed(2);
+  applySliceFields();
+}
+function previewSlice(){
+  ensureAudio().then(()=>{
+    if(!selectedPad || !selectedPad.buffer){ setMode("请先导入音频"); return; }
+    applySliceFields();
+    trigger(selectedPad);
+    const a=(selectedPad.sliceStart||0).toFixed(2);
+    const b=(selectedPad.sliceLen||0).toFixed(2);
+    setMode("试听 "+selectedPad.key+" · "+a+"s + "+b+"s");
+  }).catch(()=>{});
+}
+function autoSliceAll(){
+  if(!sharedSong || !sharedSong.buffer){
+    if(selectedPad && selectedPad.buffer){
+      sharedSong={buffer:selectedPad.buffer, name:selectedPad.localName||"local", fileKey:selectedPad.fileKey||newFileKey(), dur:selectedPad.buffer.duration};
+      showImportInfo();
+    }else{ setMode("请先导入一首较长的音频"); return; }
+  }
+  const buf=sharedSong.buffer;
+  const {slices, auto}=slicesFromOnsets(detectOnsets(buf), buf.duration, 16, 2);
+  applySlices(slices, sharedSong.name, sharedSong.fileKey, buf);
+  setMode(auto ? "已按音头自动切成 16 段" : "未检测到足够音头，已按均等切片");
+}
+async function ingestFile(file, mode){
+  try{ await ensureAudio(); }catch(e){ return; }
+  setMode("正在解码…");
+  try{
+    const ab=await file.arrayBuffer();
+    const copy=ab.slice(0);
+    const buf=await decodeAudio(ab);
+    const key=newFileKey();
+    fileCache.set(key, copy);
+    sharedSong={buffer:buf, name:file.name, fileKey:key, dur:buf.duration};
+    showImportInfo();
+    if(mode==="slice"){
+      assignSliceToPad(selectedPad, 0, Math.min(2, buf.duration));
+      setMode("已导入，可微调切片或点「自动切」");
+    }else{
+      assignWholeToPad(selectedPad, buf, file.name, key);
+      setMode("已整段分配到垫子 "+selectedPad.key+" · "+selectedPad.name);
+    }
+    schedulePersist();
+  }catch(e){ alert("这个文件解码失败，换一个 wav / mp3 / m4a 试试。"); setMode("解码失败"); }
+}
+function restorePad(p){
+  p.buffer=null; p.sliceStart=0; p.sliceLen=null; p.source="synth"; p.fileKey=null; p.localName=null;
+  refreshPad(p); syncSliceFields();
+}
+function restoreAllPads(){
+  PADS.forEach(restorePad);
+  schedulePersist();
+  if(ctx) loadDefaultSamples();
+  setMode("已全部恢复为合成音");
+}
+
+function openIdb(){
+  return new Promise((res,rej)=>{
+    if(!idbAvailable || !window.indexedDB){ rej(new Error("no idb")); return; }
+    try{
+      const r=indexedDB.open(IDB_NAME, IDB_VER);
+      r.onupgradeneeded=()=>{
+        const db=r.result;
+        if(!db.objectStoreNames.contains("files")) db.createObjectStore("files");
+        if(!db.objectStoreNames.contains("meta")) db.createObjectStore("meta");
+      };
+      r.onsuccess=()=>res(r.result);
+      r.onerror=()=>rej(r.error);
+    }catch(e){ rej(e); }
+  });
+}
+function idbReq(tx, req){
+  return new Promise((res,rej)=>{
+    tx.onerror=()=>rej(tx.error);
+    req.onsuccess=()=>res(req.result);
+    req.onerror=()=>rej(req.error);
+  });
+}
+function schedulePersist(){ clearTimeout(persistTimer); persistTimer=setTimeout(()=>{ persistLocal().catch(()=>{}); }, 400); }
+async function persistLocal(){
+  if(!idbAvailable) return;
+  try{
+    const db=await openIdb();
+    const tx=db.transaction(["files","meta"], "readwrite");
+    const files=tx.objectStore("files"), meta=tx.objectStore("meta");
+    const padRecs=PADS.map(p=>{
+      if(!isUser(p) || !p.fileKey) return {idx:p.idx, source:"synth"};
+      return {idx:p.idx, source:p.source, fileKey:p.fileKey, sliceStart:p.sliceStart||0, sliceLen:p.sliceLen, name:p.localName||""};
+    });
+    const keys=new Set(padRecs.filter(r=>r.fileKey).map(r=>r.fileKey));
+    if(sharedSong && sharedSong.fileKey) keys.add(sharedSong.fileKey);
+    for(const k of keys){
+      const raw=fileCache.get(k);
+      if(raw) files.put({ab:raw, name:(sharedSong && sharedSong.fileKey===k && sharedSong.name) || (PADS.find(p=>p.fileKey===k)||{}).localName || ""}, k);
+    }
+    meta.put({pads:padRecs, songKey:sharedSong && sharedSong.fileKey, songName:sharedSong && sharedSong.name}, "state");
+    await new Promise((res,rej)=>{ tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
+  }catch(e){ idbAvailable=false; showIdbHint("当前浏览器不能在本地记住音频，刷新后需要重新导入。"); }
+}
+function idbGet(db, store, key){
+  return new Promise((res,rej)=>{
+    const tx=db.transaction(store, "readonly");
+    const req=tx.objectStore(store).get(key);
+    req.onsuccess=()=>res(req.result);
+    req.onerror=()=>rej(req.error);
+    tx.onerror=()=>rej(tx.error);
+  });
+}
+async function restoreLocalAudio(){
+  if(!ctx) return;
+  try{
+    const db=await openIdb();
+    const state=await idbGet(db, "meta", "state");
+    if(!state || !state.pads) return;
+    const decoded={};
+    for(const rec of state.pads){
+      if(!rec.fileKey || rec.source==="synth") continue;
+      const p=PADS[rec.idx]; if(!p) continue;
+      if(!decoded[rec.fileKey]){
+        const f=await idbGet(db, "files", rec.fileKey);
+        if(!f || !f.ab) continue;
+        fileCache.set(rec.fileKey, f.ab);
+        try{ decoded[rec.fileKey]={buf:await decodeAudio(f.ab.slice(0)), name:f.name||rec.name||""}; }
+        catch(e){ continue; }
+      }
+      const d=decoded[rec.fileKey]; if(!d) continue;
+      p.buffer=d.buf; p.sliceStart=rec.sliceStart||0; p.sliceLen=rec.sliceLen;
+      p.source=rec.source; p.fileKey=rec.fileKey; p.localName=rec.name||d.name;
+      refreshPad(p);
+    }
+    if(state.songKey && decoded[state.songKey]){
+      sharedSong={buffer:decoded[state.songKey].buf, name:state.songName||decoded[state.songKey].name, fileKey:state.songKey, dur:decoded[state.songKey].buf.duration};
+      showImportInfo();
+    }
+    if(state.pads.some(r=>r.fileKey)){ syncSliceFields(); setMode("已恢复本机保存的本地音频"); }
+  }catch(e){ /* private mode or empty */ }
+}
+async function clearLocalAudio(){
+  PADS.forEach(p=>{ if(isUser(p)) restorePad(p); });
+  sharedSong=null; fileCache.clear(); showImportInfo();
+  try{
+    const db=await openIdb();
+    const tx=db.transaction(["files","meta"], "readwrite");
+    tx.objectStore("files").clear();
+    tx.objectStore("meta").clear();
+    await new Promise((res,rej)=>{ tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
+  }catch(e){}
+  if(ctx) loadDefaultSamples();
+  setMode("已清除本地音频");
+}
+function showIdbHint(s){ const el=$("idbHint"); if(!el) return; el.hidden=!s; el.textContent=s||""; }
+async function announceSavedLocal(){
+  if(!idbAvailable) return;
+  try{
+    const db=await openIdb();
+    const state=await idbGet(db, "meta", "state");
+    if(state && state.pads && state.pads.some(r=>r.fileKey))
+      showIdbHint("这台设备存有上次导入的音频，点「点击开启声音」后会恢复。");
+  }catch(e){ idbAvailable=false; showIdbHint("当前浏览器不能在本地记住音频，刷新后需要重新导入。"); }
+}
+function initImportUI(){
+  const sel=$("padSelect");
+  PADS.forEach(p=>{
+    const o=document.createElement("option");
+    o.value=String(p.idx);
+    o.textContent=p.key+" · "+p.name;
+    sel.appendChild(o);
+  });
+  sel.addEventListener("change",()=>selectPad(PADS[+sel.value]));
+  $("importFile").addEventListener("change",e=>{
+    const f=e.target.files && e.target.files[0];
+    const mode=$("modeSlice").checked ? "slice" : "assign";
+    if(f) ingestFile(f, mode);
+    e.target.value="";
+  });
+  $("btnPreview").addEventListener("click", previewSlice);
+  $("btnAutoSlice").addEventListener("click", autoSliceAll);
+  $("btnRestorePad").addEventListener("click",()=>{
+    restorePad(selectedPad);
+    schedulePersist();
+    setMode("已恢复垫子 "+selectedPad.key+" 为合成音");
+  });
+  $("btnRestoreAll").addEventListener("click", restoreAllPads);
+  $("btnClearLocal").addEventListener("click", clearLocalAudio);
+  $("sliceStart").addEventListener("change", applySliceFields);
+  $("sliceLen").addEventListener("change", applySliceFields);
+  $("nudgeStartM").addEventListener("click",()=>nudgeStart(-0.1));
+  $("nudgeStartP").addEventListener("click",()=>nudgeStart(0.1));
+  selectPad(PADS[0]);
+  announceSavedLocal();
+}
+
 
 // ---------- Trigger ----------
 function trigger(p,t=null,visual=true){
@@ -501,7 +959,7 @@ function buildGrid(){
     const el=document.createElement("div");
     el.className="pad g-"+p.group; el.setAttribute("role","button"); el.setAttribute("aria-label",p.name);
     el.innerHTML=`<span class="k">${p.key}</span><span class="src"></span><div class="n">${p.name}</div><div class="d">${p.desc}</div>`;
-    el.addEventListener("pointerdown",e=>{ e.preventDefault(); trigger(p); });
+    el.addEventListener("pointerdown",e=>{ e.preventDefault(); selectPad(p); trigger(p); });
     el.addEventListener("contextmenu",e=>e.preventDefault());
     grid.appendChild(el); p.el=el;
     const tr=document.createElement("tr");
@@ -514,12 +972,28 @@ function buildGrid(){
 }
 function refreshPad(p){
   const s=p.el.querySelector(".src"), st=p.row.querySelector(".st");
-  const isS=p.source!=="synth";
-  s.textContent=isS?"SMP":"SYN"; s.classList.toggle("sample",isS);
-  st.textContent=isS?p.source:"合成"; st.classList.toggle("ok",isS);
+  const user=isUser(p), isS=p.source!=="synth";
+  s.textContent=user?"本地":(isS?"SMP":"SYN");
+  s.classList.toggle("sample", isS && !user);
+  s.classList.toggle("local", user);
+  p.el.classList.toggle("has-user", user);
+  let label="合成";
+  if(user){
+    const a=(p.sliceStart||0).toFixed(2);
+    label=p.source+(p.sliceLen!=null ? " "+a+"s+"+(+p.sliceLen).toFixed(2)+"s" : " 整段");
+  }else if(isS) label=p.source;
+  st.textContent=label; st.classList.toggle("ok",isS);
 }
 
 buildGrid();
+initImportUI();
+window.__mpc={
+  padState(){ return PADS.map(p=>({key:p.key, source:p.source, hasBuf:!!p.buffer, dur:p.buffer?p.buffer.duration:0, start:p.sliceStart||0, len:p.sliceLen, sampleRate:p.buffer?p.buffer.sampleRate:0, marker:p.el && p.el.querySelector(".src").textContent})); },
+  triggerIdx(i){ trigger(PADS[i]); return {ok:true, ctx:ctx&&ctx.state}; },
+  mode(){ return $("lcdMode").textContent; },
+  autoSlice(){ autoSliceAll(); return $("lcdMode").textContent; },
+  ctxState(){ return ctx?ctx.state:null; }
+};
 $("btnDrums").addEventListener("click",toggleDrums);
 $("btnMetro").addEventListener("click",toggleMetro);
 $("btnDemo").addEventListener("click",toggleDemo);
