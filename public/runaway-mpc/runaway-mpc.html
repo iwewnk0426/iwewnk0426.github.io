@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" href="data:,">
+<title>Runaway MPC · 网页打击垫</title>
+<style>
+  :root{
+    --body:#1b1c1f; --body2:#26282c; --edge:#0d0e10; --pad:#3a3c41; --pad-hi:#55585f;
+    --lcd:#a9c47a; --lcd-dark:#26331a; --red:#d83a2e; --txt:#d8d8d8; --muted:#8a8d93;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#0b0b0c;color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;}
+  body{min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:16px 10px 40px}
+  .mpc{width:100%;max-width:760px;background:linear-gradient(160deg,var(--body2),var(--body) 55%,#141518);
+    border-radius:18px;border:1px solid #33353a;box-shadow:0 20px 50px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06);padding:18px}
+  .top{display:flex;gap:14px;align-items:stretch;flex-wrap:wrap}
+  .brand{flex:0 0 auto;display:flex;flex-direction:column;justify-content:space-between;min-width:120px}
+  .brand .logo{font-weight:900;letter-spacing:.18em;font-size:22px;color:#e9e9e9}
+  .brand .logo span{color:var(--red)}
+  .brand .sub{font-size:11px;color:var(--muted);letter-spacing:.12em}
+  .lcd{flex:1 1 300px;background:linear-gradient(180deg,#b6d084,var(--lcd));color:var(--lcd-dark);border-radius:6px;
+    border:3px solid #0e0f11;box-shadow:inset 0 0 18px rgba(0,0,0,.35);padding:8px 12px;font-family:"Courier New",ui-monospace,monospace;
+    display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:14px;min-height:96px}
+  .lcd .big{font-size:22px;font-weight:700}
+  .lcd .row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lcd .full{grid-column:1/3}
+  .transport{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 14px;align-items:center}
+  .btn{appearance:none;border:none;border-radius:8px;padding:10px 14px;font-weight:700;font-size:14px;color:#ddd;
+    background:linear-gradient(180deg,#45474d,#2e3034);box-shadow:0 3px 0 #0c0d0f, inset 0 1px 0 rgba(255,255,255,.12);cursor:pointer;touch-action:manipulation}
+  .btn:active{transform:translateY(2px);box-shadow:0 1px 0 #0c0d0f}
+  .btn.on{background:linear-gradient(180deg,#e3483b,#a8251b);color:#fff}
+  .btn.pending{background:linear-gradient(180deg,#d9a234,#9a6a10);color:#111}
+  .ctl{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+  .ctl input[type=number]{width:62px;background:#111;color:#e6e6e6;border:1px solid #444;border-radius:6px;padding:7px 6px;font-size:14px}
+  .ctl input[type=range]{width:96px;accent-color:var(--red)}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;background:#111214;padding:14px;border-radius:12px;box-shadow:inset 0 2px 10px rgba(0,0,0,.8)}
+  .pad{position:relative;aspect-ratio:1/1;border-radius:10px;background:radial-gradient(circle at 50% 35%,#4a4c52,var(--pad) 60%,#2c2e32);
+    border:1px solid #1a1b1d;box-shadow:0 4px 0 #0a0a0b, inset 0 1px 1px rgba(255,255,255,.1), inset 0 -6px 10px rgba(0,0,0,.35);
+    user-select:none;-webkit-user-select:none;touch-action:none;cursor:pointer;display:flex;flex-direction:column;justify-content:flex-end;padding:8px;
+    transition:background .08s, box-shadow .08s, transform .05s;overflow:hidden;-webkit-tap-highlight-color:transparent}
+  .pad .k{position:absolute;top:6px;left:8px;font:700 12px ui-monospace,monospace;color:#9da0a6;background:rgba(0,0,0,.35);padding:1px 6px;border-radius:4px}
+  .pad .src{position:absolute;top:6px;right:8px;font-size:10px;color:#777}
+  .pad .src.sample{color:#7fd17f}
+  .pad .n{font-weight:800;font-size:clamp(11px,2.6vw,15px);color:#eee;line-height:1.15}
+  .pad .d{font-size:clamp(9px,2vw,11px);color:#9a9ca1;margin-top:2px}
+  .pad.g-piano{--glow:#ffffff}
+  .pad.g-chord{--glow:#8fc1ff}
+  .pad.g-drum{--glow:#ff5a3c}
+  .pad.g-fx{--glow:#c48cff}
+  .pad.g-vox{--glow:#ffd24a}
+  .pad::after{content:"";position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--glow);opacity:.45}
+  .pad.hit{transform:translateY(3px);box-shadow:0 1px 0 #0a0a0b, 0 0 22px var(--glow), inset 0 0 26px color-mix(in srgb,var(--glow) 55%,transparent);
+    background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--glow) 70%,#fff),color-mix(in srgb,var(--glow) 35%,var(--pad)) 70%)}
+  .pad.hit .n,.pad.hit .d{color:#111}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin:10px 2px 0}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+  details{margin-top:16px;background:#15161a;border:1px solid #2b2d31;border-radius:10px;padding:10px 12px}
+  summary{cursor:pointer;font-weight:700;color:#ddd}
+  .samples{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
+  .samples td{padding:5px 4px;border-top:1px solid #26282c;vertical-align:middle}
+  .samples code{color:#bcd;font-size:11.5px}
+  .samples .st{color:var(--muted);white-space:nowrap}
+  .samples .st.ok{color:#7fd17f}
+  .samples label.file{display:inline-block;background:#2e3035;border-radius:6px;padding:4px 8px;cursor:pointer;color:#ddd;white-space:nowrap}
+  .samples input[type=file]{display:none}
+  .samples button{background:#2e3035;border:none;color:#bbb;border-radius:6px;padding:4px 8px;cursor:pointer}
+  .note{font-size:12px;color:var(--muted);line-height:1.6;margin-top:12px}
+  .help{font-size:13px;color:#bfc1c5;line-height:1.7}
+  .help kbd{background:#2b2d31;border-radius:4px;padding:0 5px;font-size:12px}
+  @media (max-width:520px){ .mpc{padding:12px} .grid{gap:8px;padding:10px} .brand{min-width:0;flex-direction:row;align-items:baseline;gap:10px;width:100%} .ctl input[type=range]{width:74px} .samples .fn{display:none} }
+</style>
+</head>
+<body>
+<div class="mpc" id="mpc">
+  <div class="top">
+    <div class="brand"><div class="logo">MPC<span>·</span>RW</div><div class="sub">WEB SAMPLER 16</div></div>
+    <div class="lcd" aria-live="polite">
+      <div class="row">BPM <span class="big" id="lcdBpm">87</span></div>
+      <div class="row">BAR <span class="big" id="lcdPos">--.-</span></div>
+      <div class="row full">PAD&nbsp; <span id="lcdPad">—</span></div>
+      <div class="row full">MODE <span id="lcdMode">点任意垫子开始 / TAP TO START</span></div>
+    </div>
+  </div>
+
+  <div class="transport">
+    <button class="btn" id="btnDrums" title="快捷键：空格">进鼓 ▶</button>
+    <button class="btn" id="btnDemo" title="快捷键：P">示范前奏</button>
+    <button class="btn" id="btnMetro" title="快捷键：M">节拍器</button>
+    <button class="btn" id="btnStop" title="快捷键：Esc">全部停止</button>
+    <label class="ctl">BPM <input type="number" id="bpm" min="50" max="180" step="1" value="87"></label>
+    <label class="ctl">音量 <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8"></label>
+    <label class="ctl">混响 <input type="range" id="rev" min="0" max="1" step="0.01" value="0.35"></label>
+  </div>
+
+  <div class="grid" id="grid"></div>
+  <div class="legend">
+    <span><i style="background:#fff"></i>钢琴单音</span><span><i style="background:#8fc1ff"></i>和弦 / 808</span>
+    <span><i style="background:#ff5a3c"></i>鼓</span><span><i style="background:#ffd24a"></i>人声替身</span><span><i style="background:#c48cff"></i>效果</span>
+  </div>
+
+  <details>
+    <summary>换音色：放 samples/ 文件或从本地载入</summary>
+    <div class="note">每个垫子会先尝试加载 <code>samples/文件名</code>（和本页面同目录）。没有文件时自动用浏览器合成的音色。也可以点「本地文件」临时换成你自己的音频：文件只在你的浏览器里解码播放，不会上传到任何地方，刷新页面后失效。</div>
+    <table class="samples" id="sampleTable"></table>
+  </details>
+
+  <details>
+    <summary>快捷键 / 小贴士</summary>
+    <div class="help">
+      垫子键位：<kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> / <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd> / <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd> / <kbd>Z</kbd><kbd>X</kbd><kbd>C</kbd><kbd>V</kbd>（和屏幕上的排列一一对应）。<br>
+      <kbd>空格</kbd> 进鼓 / 收鼓（在下一小节第 1 拍生效）　<kbd>P</kbd> 示范前奏　<kbd>M</kbd> 节拍器　<kbd>Esc</kbd> 全部停止。<br>
+      手机上第一次点击会唤醒音频；如果没声音，请关掉静音开关再点一次。
+    </div>
+  </details>
+  <div class="note">所有默认声音都是浏览器实时合成的替身音色，不含原曲录音或任何人声片段。“Look at ya” 垫子是合成的类人声音效，不是原版采样。</div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+// ---------- Pad definitions (order = screen order = key order) ----------
+const NOTE = n => 440 * Math.pow(2, (n - 69) / 12); // MIDI -> Hz
+const PADS = [
+  {key:"1", code:"Digit1", name:"E5 Intro", desc:"前奏高音 E", file:"piano-e.wav",   group:"piano", play:t=>pianoNote(76,t,1.0,true)},
+  {key:"2", code:"Digit2", name:"D#5",      desc:"往下一级",   file:"piano-ds.wav",  group:"piano", play:t=>pianoNote(75,t,0.95,true)},
+  {key:"3", code:"Digit3", name:"C#5",      desc:"再往下",     file:"piano-cs.wav",  group:"piano", play:t=>pianoNote(73,t,0.95,true)},
+  {key:"4", code:"Digit4", name:"E maj",    desc:"E 和弦·长音", file:"chord-e.wav", group:"chord", play:t=>pianoChord([40,52,56,59,64],t,0.75)},
+  {key:"Q", code:"KeyQ",   name:"C#m",      desc:"升 C 小和弦", file:"chord-csm.wav", group:"chord", play:t=>pianoChord([37,49,56,61,64],t,0.75)},
+  {key:"W", code:"KeyW",   name:"A maj",    desc:"A 大三和弦",  file:"chord-a.wav",   group:"chord", play:t=>pianoChord([33,45,57,61,64],t,0.75)},
+  {key:"E", code:"KeyE",   name:"B maj",    desc:"B 大三和弦",  file:"chord-b.wav",   group:"chord", play:t=>pianoChord([35,47,54,59,63],t,0.75)},
+  {key:"R", code:"KeyR",   name:"808 Sub",  desc:"低音 E",      file:"sub-808.wav",   group:"chord", play:t=>sub808(28,t)},
+  {key:"A", code:"KeyA",   name:"Kick",     desc:"底鼓",        file:"kick.wav",      group:"drum",  play:t=>kick(t,1)},
+  {key:"S", code:"KeyS",   name:"Snare+Bell",desc:"军鼓·铃",    file:"snare.wav",     group:"drum",  play:t=>snare(t,1)},
+  {key:"D", code:"KeyD",   name:"Hi-Hat",   desc:"踩镲",        file:"hihat.wav",     group:"drum",  play:t=>hihat(t,0.8,false)},
+  {key:"F", code:"KeyF",   name:"BIG HIT",  desc:"重拍大鼓",    file:"big-hit.wav",   group:"drum",  play:t=>bigHit(t)},
+  {key:"Z", code:"KeyZ",   name:"Look at ya",desc:"合成替身",   file:"look-at-ya.wav",group:"vox",   play:t=>lookAtYa(t)},
+  {key:"X", code:"KeyX",   name:"Vox Chop", desc:"人声切片替身",file:"vocal-chop.wav",group:"vox",   play:t=>voxChop(t)},
+  {key:"C", code:"KeyC",   name:"Riser",    desc:"上升 / 反向", file:"riser.wav",     group:"fx",    play:t=>riser(t)},
+  {key:"V", code:"KeyV",   name:"Crash",    desc:"镲片",        file:"crash.wav",     group:"fx",    play:t=>crash(t)},
+];
+PADS.forEach((p,i)=>{p.idx=i; p.buffer=null; p.source="synth";});
+const byCode = Object.fromEntries(PADS.map(p=>[p.code,p]));
+const PAD = name => PADS.find(p=>p.file===name);
+
+// ---------- Audio graph ----------
+let ctx=null, master, comp, dry, revSend, convolver, revReturn, noiseBuf;
+function ensureAudio(){
+  if(ctx){ if(ctx.state!=="running") ctx.resume(); return ctx; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  ctx = new AC({latencyHint:"interactive"});
+  master = ctx.createGain(); master.gain.value = +$("vol").value;
+  comp = ctx.createDynamicsCompressor();
+  comp.threshold.value=-14; comp.knee.value=10; comp.ratio.value=4; comp.attack.value=0.004; comp.release.value=0.18;
+  dry = ctx.createGain(); dry.gain.value = 1;
+  revSend = ctx.createGain(); revSend.gain.value = 1;
+  convolver = ctx.createConvolver(); convolver.buffer = makeImpulse(2.8, 2.6);
+  revReturn = ctx.createGain(); revReturn.gain.value = +$("rev").value;
+  dry.connect(comp); revSend.connect(convolver); convolver.connect(revReturn); revReturn.connect(comp);
+  comp.connect(master); master.connect(ctx.destination);
+  noiseBuf = makeNoise(2);
+  loadDefaultSamples();
+  setMode("就绪 READY");
+  return ctx;
+}
+function makeImpulse(seconds, decay){
+  const len = Math.floor(ctx.sampleRate*seconds), b = ctx.createBuffer(2,len,ctx.sampleRate);
+  for(let c=0;c<2;c++){ const d=b.getChannelData(c);
+    for(let i=0;i<len;i++){ const x=i/len; d[i]=(Math.random()*2-1)*Math.pow(1-x,decay)*(i<ctx.sampleRate*0.012?0.3:1); } }
+  return b;
+}
+function makeNoise(seconds){
+  const len=Math.floor(ctx.sampleRate*seconds), b=ctx.createBuffer(1,len,ctx.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=Math.random()*2-1; return b;
+}
+// route a node to dry + reverb with a per-sound reverb amount
+function out(node, wet=0.5, gain=1){
+  const g=ctx.createGain(); g.gain.value=gain; node.connect(g);
+  g.connect(dry);
+  const s=ctx.createGain(); s.gain.value=wet; g.connect(s); s.connect(revSend);
+  return g;
+}
+function env(param,t,a,peak,d,sustain=0.0001){
+  param.cancelScheduledValues(t); param.setValueAtTime(0.0001,t);
+  param.linearRampToValueAtTime(peak,t+a);
+  param.exponentialRampToValueAtTime(Math.max(sustain,0.0001),t+a+d);
+}
+function noiseSrc(t,dur){ const s=ctx.createBufferSource(); s.buffer=noiseBuf; s.loop=true; s.start(t, Math.random()); s.stop(t+dur); return s; }
+
+// ---------- Synth piano: additive partials + hammer + detune ----------
+function pianoNote(midi,t,vel=1,bright=false,len=null){
+  const f=NOTE(midi);
+  const decay = len || Math.max(1.6, 5.5 - (midi-40)*0.06);
+  const bus=ctx.createGain(); bus.gain.value=0.22*vel;
+  const lp=ctx.createBiquadFilter(); lp.type="lowpass";
+  lp.frequency.setValueAtTime(Math.min(16000,f*(bright?14:9)),t);
+  lp.frequency.exponentialRampToValueAtTime(Math.max(f*2.5,600),t+decay*0.6);
+  lp.Q.value=0.3;
+  bus.connect(lp); out(lp, 0.55);
+  const B=0.00035; // inharmonicity
+  const partials=[1,0.55,0.32,0.22,0.12,0.09,0.05,0.035];
+  partials.forEach((amp,i)=>{
+    const n=i+1, pf=f*n*Math.sqrt(1+B*n*n);
+    if(pf>18000) return;
+    [-1,1].forEach(side=>{
+      const o=ctx.createOscillator(); o.type="sine";
+      o.frequency.value=pf; o.detune.value=side*(1.5+i*0.4) + (Math.random()-0.5);
+      const g=ctx.createGain();
+      const d=decay/(1+i*0.55);
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.linearRampToValueAtTime(amp*0.5,t+0.004);
+      g.gain.exponentialRampToValueAtTime(amp*0.5*0.35,t+0.004+d*0.12); // fast initial drop
+      g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+      o.connect(g); g.connect(bus); o.start(t); o.stop(t+d+0.05);
+    });
+  });
+  // hammer transient
+  const h=noiseSrc(t,0.05), hb=ctx.createBiquadFilter(), hg=ctx.createGain();
+  hb.type="bandpass"; hb.frequency.value=Math.min(f*4,5000); hb.Q.value=1.2;
+  env(hg.gain,t,0.001,0.25*vel,0.035);
+  h.connect(hb); hb.connect(hg); hg.connect(bus);
+}
+function pianoChord(notes,t,vel=0.75){ notes.forEach((n,i)=>pianoNote(n,t+i*0.006,vel*(i===0?1.1:0.8),false,6.5)); }
+
+// ---------- Drums ----------
+function kick(t,vel=1){
+  const o=ctx.createOscillator(), g=ctx.createGain();
+  o.type="sine"; o.frequency.setValueAtTime(140,t); o.frequency.exponentialRampToValueAtTime(48,t+0.12);
+  env(g.gain,t,0.002,1.1*vel,0.42);
+  o.connect(g); out(g,0.08); o.start(t); o.stop(t+0.5);
+  const c=noiseSrc(t,0.02), cf=ctx.createBiquadFilter(), cg=ctx.createGain(); cf.type="highpass"; cf.frequency.value=2500;
+  env(cg.gain,t,0.0005,0.25*vel,0.015); c.connect(cf); cf.connect(cg); out(cg,0.05);
+}
+function snare(t,vel=1,bell=true){
+  const n=noiseSrc(t,0.3), bp=ctx.createBiquadFilter(), g=ctx.createGain();
+  bp.type="bandpass"; bp.frequency.value=1900; bp.Q.value=0.7;
+  env(g.gain,t,0.001,0.75*vel,0.22); n.connect(bp); bp.connect(g); out(g,0.35);
+  const o=ctx.createOscillator(), og=ctx.createGain(); o.type="triangle";
+  o.frequency.setValueAtTime(230,t); o.frequency.exponentialRampToValueAtTime(160,t+0.08);
+  env(og.gain,t,0.001,0.45*vel,0.12); o.connect(og); out(og,0.25); o.start(t); o.stop(t+0.2);
+  // clap-ish layers
+  [0.008,0.017].forEach(dt=>{ const c=noiseSrc(t+dt,0.05), cb=ctx.createBiquadFilter(), cg=ctx.createGain();
+    cb.type="bandpass"; cb.frequency.value=1200; cb.Q.value=1.5; env(cg.gain,t+dt,0.0005,0.35*vel,0.03); c.connect(cb); cb.connect(cg); out(cg,0.4); });
+  if(bell) bellTone(t, 88, 0.22*vel); // bell layer on the snare
+}
+function bellTone(t,midi,vel){
+  const f=NOTE(midi);
+  [[1,1],[2.76,0.5],[5.4,0.25],[8.93,0.12]].forEach(([r,a])=>{
+    const o=ctx.createOscillator(), g=ctx.createGain(); o.type="sine"; o.frequency.value=f*r;
+    env(g.gain,t,0.001,a*vel,0.9/r+0.2); o.connect(g); out(g,0.6); o.start(t); o.stop(t+1.3);
+  });
+}
+function hihat(t,vel=0.7,open=false){
+  const n=noiseSrc(t,open?0.45:0.08), hp=ctx.createBiquadFilter(), g=ctx.createGain();
+  hp.type="highpass"; hp.frequency.value=7000;
+  env(g.gain,t,0.0008,0.35*vel,open?0.35:0.045); n.connect(hp); hp.connect(g); out(g,0.15);
+}
+function crash(t){
+  const n=noiseSrc(t,2.6), hp=ctx.createBiquadFilter(), g=ctx.createGain();
+  hp.type="highpass"; hp.frequency.value=4200;
+  env(g.gain,t,0.002,0.5,2.4); n.connect(hp); hp.connect(g); out(g,0.5);
+  [523,797,1101,1452].forEach(f=>{ const o=ctx.createOscillator(), og=ctx.createGain(), b=ctx.createBiquadFilter();
+    o.type="square"; o.frequency.value=f*3.1; b.type="highpass"; b.frequency.value=5000;
+    env(og.gain,t,0.002,0.03,1.6); o.connect(b); b.connect(og); out(og,0.5); o.start(t); o.stop(t+1.8); });
+}
+function sub808(midi,t,len=1.6){
+  const f=NOTE(midi), o=ctx.createOscillator(), g=ctx.createGain(), sh=ctx.createWaveShaper();
+  o.type="sine"; o.frequency.setValueAtTime(f*2.2,t); o.frequency.exponentialRampToValueAtTime(f,t+0.06);
+  const curve=new Float32Array(1024); for(let i=0;i<1024;i++){ const x=i/512-1; curve[i]=Math.tanh(x*2.2); } sh.curve=curve;
+  g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.9,t+0.005); g.gain.exponentialRampToValueAtTime(0.0001,t+len);
+  o.connect(sh); sh.connect(g); out(g,0.05); o.start(t); o.stop(t+len+0.05);
+}
+function bigHit(t){
+  kick(t,1.2); snare(t,1.1,false); sub808(28,t,1.4);
+  const n=noiseSrc(t,1.4), lp=ctx.createBiquadFilter(), g=ctx.createGain(); lp.type="lowpass"; lp.frequency.value=3000;
+  env(g.gain,t,0.002,0.5,1.2); n.connect(lp); lp.connect(g); out(g,1.0);
+  const o=ctx.createOscillator(), og=ctx.createGain(); o.type="sine"; o.frequency.setValueAtTime(110,t); o.frequency.exponentialRampToValueAtTime(70,t+0.4);
+  env(og.gain,t,0.002,0.6,0.7); o.connect(og); out(og,0.8); o.start(t); o.stop(t+0.8);
+}
+
+// ---------- Vocal-ish formant stand-ins (synthesized, NOT samples) ----------
+const VOWELS = { u:[350,800,2400], a:[750,1150,2600], e:[450,1750,2550], i:[300,2200,2950], uh:[600,1050,2450] };
+function formantSyll(t,dur,f0,f0end,v1,v2,vel=1){
+  const src=ctx.createOscillator(); src.type="sawtooth";
+  src.frequency.setValueAtTime(f0,t); src.frequency.linearRampToValueAtTime(f0end,t+dur);
+  const vib=ctx.createOscillator(), vg=ctx.createGain(); vib.frequency.value=5.5; vg.gain.value=f0*0.012; vib.connect(vg); vg.connect(src.frequency);
+  const asp=noiseSrc(t,dur), ag=ctx.createGain(); ag.gain.value=0.05;
+  const sum=ctx.createGain(); src.connect(sum); asp.connect(ag); ag.connect(sum);
+  const g=ctx.createGain(); env(g.gain,t,0.012,0.55*vel,dur);
+  const A=VOWELS[v1], Bv=VOWELS[v2||v1];
+  [0,1,2].forEach(k=>{
+    const bp=ctx.createBiquadFilter(); bp.type="bandpass"; bp.Q.value=[8,10,12][k];
+    bp.frequency.setValueAtTime(A[k],t); bp.frequency.linearRampToValueAtTime(Bv[k],t+dur*0.6);
+    const kg=ctx.createGain(); kg.gain.value=[1,0.6,0.25][k]*3;
+    sum.connect(bp); bp.connect(kg); kg.connect(g);
+  });
+  out(g,0.45);
+  src.start(t); src.stop(t+dur+0.05); vib.start(t); vib.stop(t+dur+0.05);
+}
+function lookAtYa(t){
+  // "LOOK" - "at" - "YA!"  : three shouted syllables, rough rhythm
+  formantSyll(t,      0.20, 260, 230, "u","uh", 1.0);
+  formantSyll(t+0.20, 0.12, 250, 240, "a","e", 0.8);
+  formantSyll(t+0.33, 0.32, 300, 210, "i","a", 1.1);
+}
+function voxChop(t){ formantSyll(t,0.35,NOTE(64),NOTE(63),"a","uh",1.0); formantSyll(t,0.35,NOTE(71),NOTE(70),"a","uh",0.5); }
+function riser(t){
+  const dur=60/bpm*4;
+  const n=noiseSrc(t,dur), bp=ctx.createBiquadFilter(), g=ctx.createGain();
+  bp.type="bandpass"; bp.Q.value=4; bp.frequency.setValueAtTime(300,t); bp.frequency.exponentialRampToValueAtTime(9000,t+dur);
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.6,t+dur*0.97); g.gain.linearRampToValueAtTime(0,t+dur);
+  n.connect(bp); bp.connect(g); out(g,0.6);
+  const o=ctx.createOscillator(), og=ctx.createGain(); o.type="sawtooth";
+  o.frequency.setValueAtTime(NOTE(40),t); o.frequency.exponentialRampToValueAtTime(NOTE(76),t+dur);
+  og.gain.setValueAtTime(0.0001,t); og.gain.exponentialRampToValueAtTime(0.08,t+dur*0.97); og.gain.linearRampToValueAtTime(0,t+dur);
+  o.connect(og); out(og,0.6); o.start(t); o.stop(t+dur);
+}
+
+// ---------- Samples ----------
+function playBuffer(p,t){
+  const s=ctx.createBufferSource(); s.buffer=p.buffer; const g=out(s,0.3,0.9); s.start(t); return g;
+}
+async function loadDefaultSamples(){
+  if(location.protocol==="file:") return; // fetch of local files is blocked; synth fallback
+  // samples/samples.json lists which files exist (avoids 16 noisy 404s).
+  // If the manifest is missing, probe every fixed filename instead.
+  let list=null;
+  try{ const m=await fetch("samples/samples.json",{cache:"no-cache"}); if(m.ok) list=await m.json(); }catch(e){}
+  const wanted = Array.isArray(list) ? PADS.filter(p=>list.includes(p.file)) : PADS;
+  for(const p of wanted){
+    try{
+      const r=await fetch("samples/"+p.file,{cache:"no-cache"});
+      if(!r.ok) continue;
+      const ct=(r.headers.get("content-type")||"");
+      if(ct.includes("text/html")) continue; // SPA/404 page served as HTML
+      const ab=await r.arrayBuffer();
+      p.buffer=await ctx.decodeAudioData(ab); p.source="samples/";
+    }catch(e){ /* missing or undecodable: keep synth */ }
+    refreshPad(p);
+  }
+}
+async function loadLocalFile(p,file){
+  ensureAudio();
+  try{ const ab=await file.arrayBuffer(); p.buffer=await ctx.decodeAudioData(ab); p.source="本地:"+file.name; }
+  catch(e){ alert("这个文件解码失败，换一个 wav / mp3 / m4a 试试。"); }
+  refreshPad(p);
+}
+
+// ---------- Trigger ----------
+function trigger(p,t=null,visual=true){
+  ensureAudio();
+  const when = t==null ? ctx.currentTime+0.005 : t;
+  if(p.buffer) playBuffer(p,when); else p.play(when);
+  if(visual) flash(p, when);
+}
+function flash(p,when){
+  const delay=Math.max(0,(when-ctx.currentTime)*1000);
+  setTimeout(()=>{ const el=p.el; el.classList.add("hit"); $("lcdPad").textContent=`${p.key} · ${p.name} (${p.desc})`;
+    clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("hit"),110); }, delay);
+}
+
+// ---------- Transport / lookahead scheduler ----------
+let bpm=87, running=false, nextTime=0, step=0, timer=null;
+let drumsOn=false, drumsStartStep=-1, drumsStopStep=-1;
+let metroOn=false, demo=null; // demo: {start, events}
+const LOOKAHEAD=25, AHEAD=0.12, SPB=16; // 16 steps per bar
+const stepDur=()=>60/bpm/4;
+
+// drum loop (1 bar, 16 steps). Boom-bap feel, approximate — not a transcription.
+const LOOP = {
+  kick:  [1,0,0,0, 0,0,0,0, 1,0,1,0, 0,0,0,0],
+  snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+  hat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,1],
+  sub:   [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+};
+function startTransport(){
+  ensureAudio();
+  if(running) return;
+  running=true; step=0; nextTime=ctx.currentTime+0.06;
+  timer=setInterval(tick,LOOKAHEAD); tick();
+}
+function stopTransport(){
+  running=false; clearInterval(timer); timer=null;
+  drumsOn=false; drumsStartStep=drumsStopStep=-1; demo=null; metroOn=false;
+  updateButtons(); $("lcdPos").textContent="--.-"; setMode("停止 STOP");
+}
+function nextBarStep(){ return running ? (Math.floor(step/SPB)+1)*SPB : 0; }
+function anythingActive(){ return drumsOn || drumsStartStep>=0 || metroOn || demo; }
+function tick(){
+  while(nextTime < ctx.currentTime + AHEAD){ scheduleStep(step,nextTime); nextTime+=stepDur(); step++; }
+  if(!anythingActive()){ stopTransport(); }
+}
+function scheduleStep(s,t){
+  const i=s%SPB;
+  if(drumsStartStep>=0 && s>=drumsStartStep){ drumsOn=true; drumsStartStep=-1; uiLater(t,()=>{updateButtons();setMode("鼓组循环中 DRUMS");}); }
+  if(drumsStopStep>=0 && s>=drumsStopStep){ drumsOn=false; drumsStopStep=-1; uiLater(t,()=>{updateButtons();setMode("收鼓 DRUMS OFF");}); }
+  if(drumsOn){
+    if(LOOP.kick[i]) trigLoop("kick.wav",t,()=>kick(t,i===0?1:0.85));
+    if(LOOP.snare[i]) trigLoop("snare.wav",t,()=>snare(t,0.95));
+    if(LOOP.hat[i]) trigLoop("hihat.wav",t,()=>hihat(t,i%4===0?0.75:0.45,i===15));
+    if(LOOP.sub[i]) trigLoop("sub-808.wav",t,()=>sub808(28,t,1.2));
+  }
+  if(metroOn && i%4===0){ const o=ctx.createOscillator(), g=ctx.createGain(); o.frequency.value=i===0?1760:1175;
+    env(g.gain,t,0.001,0.25,0.05); o.connect(g); g.connect(dry); o.start(t); o.stop(t+0.08); }
+  if(demo){
+    const rel=s-demo.start;
+    if(rel>=0){ for(const ev of demo.events) if(ev.step===rel) ev.fn(t);
+      if(rel>=demo.len){ demo=null; uiLater(t,()=>{updateButtons();setMode("示范结束 · 换你来");}); } }
+  }
+  uiLater(t,()=>{ $("lcdPos").textContent=`${Math.floor(s/SPB)+1}.${Math.floor(i/4)+1}`; });
+}
+function trigLoop(file,t,synthFn){ const p=PAD(file); if(p.buffer) playBuffer(p,t); else synthFn(); flash(p,t); }
+function uiLater(t,fn){ setTimeout(fn,Math.max(0,(t-ctx.currentTime)*1000)); }
+
+// Demo intro (APPROXIMATE arrangement, see tutorial):
+//  bars 1-4 : high E quarter notes, 15 times, 16th beat drops to D#
+//  bars 5-8 : "E E E + lower note" per bar over E / C#m / A / B chords
+function buildDemo(){
+  const ev=[], add=(bar,beat,fn)=>ev.push({step:(bar-1)*SPB+(beat-1)*4,fn});
+  const E=PAD("piano-e.wav"), DS=PAD("piano-ds.wav"), CS=PAD("piano-cs.wav");
+  for(let bar=1;bar<=4;bar++) for(let beat=1;beat<=4;beat++) add(bar,beat,t=>trigger(bar===4&&beat===4?DS:E,t));
+  const chords=["chord-e.wav","chord-csm.wav","chord-a.wav","chord-b.wav"], low=[DS,CS,CS,DS];
+  for(let k=0;k<4;k++){ const bar=5+k;
+    add(bar,1,t=>trigger(PAD(chords[k]),t));
+    for(let beat=1;beat<=3;beat++) add(bar,beat,t=>trigger(E,t));
+    add(bar,4,t=>trigger(low[k],t));
+  }
+  add(8,1,t=>trigger(PAD("riser.wav"),t));
+  add(9,1,t=>{ trigger(PAD("big-hit.wav"),t); trigger(PAD("crash.wav"),t); trigger(E,t); });
+  return {events:ev,len:8*SPB+1};
+}
+
+// ---------- UI ----------
+function $(id){ return document.getElementById(id); }
+function setMode(s){ $("lcdMode").textContent=s; }
+function updateButtons(){
+  const d=$("btnDrums");
+  d.classList.toggle("on",drumsOn && drumsStopStep<0);
+  d.classList.toggle("pending",drumsStartStep>=0 || drumsStopStep>=0);
+  d.textContent = drumsStartStep>=0 ? "下一小节进鼓…" : drumsStopStep>=0 ? "下一小节收鼓…" : drumsOn ? "收鼓 ■" : "进鼓 ▶";
+  $("btnMetro").classList.toggle("on",metroOn);
+  $("btnDemo").classList.toggle("on",!!demo);
+}
+function toggleDrums(){
+  ensureAudio();
+  if(drumsOn){ drumsStopStep = drumsStopStep>=0 ? -1 : nextBarStep(); }
+  else if(drumsStartStep>=0){ drumsStartStep=-1; }
+  else { const wasRunning=running; drumsStartStep = wasRunning ? nextBarStep() : 0; if(!wasRunning) startTransport();
+    setMode(wasRunning?"下一小节进鼓 QUEUED":"鼓组循环中 DRUMS"); }
+  updateButtons();
+}
+function toggleMetro(){ ensureAudio(); metroOn=!metroOn; if(metroOn) startTransport(); updateButtons(); }
+function toggleDemo(){
+  ensureAudio();
+  if(demo){ demo=null; updateButtons(); setMode("示范已停 DEMO OFF"); return; }
+  const wasRunning=running; const d=buildDemo(); d.start = wasRunning ? nextBarStep() : 0; demo=d;
+  if(!wasRunning) startTransport();
+  setMode("示范前奏 DEMO"); updateButtons();
+}
+
+function buildGrid(){
+  const grid=$("grid"), tbl=$("sampleTable");
+  PADS.forEach(p=>{
+    const el=document.createElement("div");
+    el.className="pad g-"+p.group; el.setAttribute("role","button"); el.setAttribute("aria-label",p.name);
+    el.innerHTML=`<span class="k">${p.key}</span><span class="src"></span><div class="n">${p.name}</div><div class="d">${p.desc}</div>`;
+    el.addEventListener("pointerdown",e=>{ e.preventDefault(); trigger(p); });
+    el.addEventListener("contextmenu",e=>e.preventDefault());
+    grid.appendChild(el); p.el=el;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td><b>${p.key}</b> ${p.name}</td><td class="fn"><code>samples/${p.file}</code></td><td class="st"></td>
+      <td><label class="file">本地文件<input type="file" accept="audio/*"></label></td><td><button>还原</button></td>`;
+    tr.querySelector("input").addEventListener("change",e=>{ const f=e.target.files[0]; if(f) loadLocalFile(p,f); e.target.value=""; });
+    tr.querySelector("button").addEventListener("click",()=>{ p.buffer=null; p.source="synth"; refreshPad(p); });
+    tbl.appendChild(tr); p.row=tr; refreshPad(p);
+  });
+}
+function refreshPad(p){
+  const s=p.el.querySelector(".src"), st=p.row.querySelector(".st");
+  const isS=p.source!=="synth";
+  s.textContent=isS?"SMP":"SYN"; s.classList.toggle("sample",isS);
+  st.textContent=isS?p.source:"合成"; st.classList.toggle("ok",isS);
+}
+
+buildGrid();
+$("btnDrums").addEventListener("click",toggleDrums);
+$("btnMetro").addEventListener("click",toggleMetro);
+$("btnDemo").addEventListener("click",toggleDemo);
+$("btnStop").addEventListener("click",()=>{ if(running) stopTransport(); });
+$("bpm").addEventListener("change",e=>{ bpm=Math.min(180,Math.max(50,+e.target.value||87)); e.target.value=bpm; $("lcdBpm").textContent=bpm; });
+$("vol").addEventListener("input",e=>{ if(master) master.gain.setTargetAtTime(+e.target.value,ctx.currentTime,0.02); });
+$("rev").addEventListener("input",e=>{ if(revReturn) revReturn.gain.setTargetAtTime(+e.target.value,ctx.currentTime,0.02); });
+// unlock audio on first gesture (iOS/Android)
+["pointerdown","touchstart","keydown"].forEach(ev=>window.addEventListener(ev,()=>ensureAudio(),{once:true,passive:true}));
+window.addEventListener("keydown",e=>{
+  if(e.target.closest && e.target.closest("input,textarea,select")) return;
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  const p=byCode[e.code];
+  if(p){ e.preventDefault(); if(!e.repeat) trigger(p); return; }
+  if(e.repeat) return;
+  if(e.code==="Space"){ e.preventDefault(); toggleDrums(); }
+  else if(e.code==="KeyP") toggleDemo();
+  else if(e.code==="KeyM") toggleMetro();
+  else if(e.code==="Escape"){ if(running) stopTransport(); }
+});
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && ctx && ctx.state!=="running") ctx.resume(); });
+})();
+</script>
+</body>
+</html>

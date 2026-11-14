@@ -1,0 +1,35 @@
+Runaway MPC · 可选采样文件夹 / optional samples folder
+=====================================================
+
+默认这里是空的：页面所有声音都由浏览器实时合成。
+想换成你自己有权使用的音频，把文件按下面的固定文件名放进本文件夹，
+再把文件名加进 samples.json（例如 ["piano-e.wav","look-at-ya.wav"]），刷新页面即可。
+垫子右上角从 SYN 变成 SMP 就说明加载成功。没放的垫子继续用合成音。
+（如果删掉 samples.json，页面会逐个尝试下面 16 个文件名，缺的会在控制台显示 404，但不影响使用。）
+
+格式：wav 最稳；mp3 / m4a / ogg 只要浏览器能解码也行（文件名仍需和下表一致，或自行改扩展名对应的代码）。
+建议：单声道或立体声、44.1/48 kHz，去掉开头的静音，峰值不要削波。
+
+键 | 垫子          | 文件名
+---|---------------|----------------
+1  | E5 Intro      | piano-e.wav      前奏的高音 E 单音
+2  | D#5           | piano-ds.wav
+3  | C#5           | piano-cs.wav
+4  | E maj 长和弦   | chord-e.wav
+Q  | C#m           | chord-csm.wav
+W  | A maj         | chord-a.wav
+E  | B maj         | chord-b.wav
+R  | 808 Sub (E)   | sub-808.wav
+A  | Kick          | kick.wav         鼓循环也会用它
+S  | Snare+Bell    | snare.wav        鼓循环也会用它
+D  | Hi-Hat        | hihat.wav        鼓循环也会用它
+F  | BIG HIT       | big-hit.wav
+Z  | Look at ya    | look-at-ya.wav   默认是合成替身，不含原版人声
+X  | Vox Chop      | vocal-chop.wav
+C  | Riser         | riser.wav
+V  | Crash         | crash.wav
+
+不放文件时也可以在页面「换音色」里点「本地文件」临时载入：
+音频只在你的浏览器里解码，不会上传，刷新后失效。
+
+请只放你拥有或获授权使用的音频；本页面默认不附带、也不会下载任何原曲录音。
