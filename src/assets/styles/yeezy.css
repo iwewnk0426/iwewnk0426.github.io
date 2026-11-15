@@ -519,6 +519,50 @@ html[data-style='yeezy'] .katex-display {
   scrollbar-width: none;
 }
 
+html[data-style='yeezy'] .code-page {
+  max-width: 600px;
+  margin-right: auto;
+  margin-left: auto;
+  padding: 0 16px 32px;
+  color: #000;
+  font-size: 16px;
+  line-height: 1.8;
+  font-weight: 400;
+  text-transform: none;
+}
+
+html[data-style='yeezy'] .code-page h1,
+html[data-style='yeezy'] .code-page h2 {
+  margin: 32px 0 16px;
+  color: #000;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+  text-align: left;
+  text-transform: none;
+}
+
+html[data-style='yeezy'] .code-page p,
+html[data-style='yeezy'] .code-page li,
+html[data-style='yeezy'] .code-page a {
+  color: #000;
+  font-size: 16px;
+  line-height: 24px;
+  text-transform: none;
+}
+
+html[data-style='yeezy'] .code-page a {
+  text-decoration: none;
+}
+
+html[data-style='yeezy'] .code-page a:hover {
+  opacity: 0.7;
+}
+
+html[data-style='yeezy'] .code-token {
+  font-weight: 500;
+}
+
 html[data-style='yeezy'] :focus-visible {
   outline: 1px solid #000;
   outline-offset: 2px;
