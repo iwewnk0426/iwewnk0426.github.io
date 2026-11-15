@@ -350,7 +350,22 @@ html[data-style='yeezy'][data-yz-cols='3'] .yz-grid {
 
 .yz-label {
   font-weight: 400;
-  text-transform: none;
+  text-transform: uppercase;
+}
+
+.yz-post-code {
+  display: none;
+}
+
+html[data-style='yeezy'] .yz-post-code {
+  display: block;
+  margin: 0 0 8px;
+  color: #000;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+  text-align: center;
+  text-transform: uppercase;
 }
 
 .yz-label.is-gone {
