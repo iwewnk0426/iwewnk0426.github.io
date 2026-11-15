@@ -1,0 +1,37 @@
+---
+import type { CollectionEntry } from 'astro:content'
+
+import { PostPreview } from 'astro-pure/components/pages'
+
+interface Props {
+  posts: CollectionEntry<'blog'>[]
+  detailed?: boolean
+  class?: string
+}
+
+const { posts, detailed = false, class: className } = Astro.props
+
+function dateCode(date: Date) {
+  const y = date.getUTCFullYear()
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(date.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+---
+
+<ul class:list={['pure-posts flex flex-col text-start', detailed ? 'gap-y-4' : 'gap-y-1.5 sm:gap-y-2', className]}>
+  {posts.map((post) => <PostPreview {post} {detailed} />)}
+</ul>
+
+<div class='yz-grid' data-yz-grid>
+  {
+    posts.map((post) => (
+      <a class='yz-tile' href={`/blog/${post.id}`}>
+        <span class='yz-img'>
+          <span class='yz-mark'>{dateCode(post.data.publishDate)}</span>
+        </span>
+        <span class='yz-label'>{post.data.title}</span>
+      </a>
+    ))
+  }
+</div>

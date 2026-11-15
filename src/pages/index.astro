@@ -2,10 +2,10 @@
 import { Image } from 'astro:assets'
 import type { ImageMetadata } from 'astro'
 
-import { PostPreview } from 'astro-pure/components/pages'
 import { getBlogCollection, sortMDByDate } from 'astro-pure/server'
 import { Button } from 'astro-pure/user'
 import PageLayout from '@/layouts/BaseLayout.astro'
+import PostList from '@/components/PostList.astro'
 import Section from '@/components/home/Section.astro'
 import config from '@/site-config'
 
@@ -25,7 +25,7 @@ if (!images[imagePath])
 
 <PageLayout meta={{ title: '首页' }} highlightColor='#659EB9'>
   <main class='flex w-full flex-col items-center'>
-    <section class='animate mb-10 flex flex-col items-center gap-y-7' id='content-header'>
+    <section class='yz-chrome animate mb-10 flex flex-col items-center gap-y-7' id='content-header'>
       <Image
         src={images[imagePath]()}
         alt={config.logo.alt || 'Knox'}
@@ -40,21 +40,15 @@ if (!images[imagePath])
     </section>
 
     <div id='content' class='animate flex flex-col gap-y-10 md:w-4/5 lg:w-5/6'>
-      <Section title='关于'>
+      <Section title='关于' class='yz-chrome'>
         <p class='text-muted-foreground'>这里的内容待补充。</p>
         <Button title='关于' class='w-fit self-end' href='/about' variant='ahead' />
       </Section>
       {
         allPostsByDate.length > 0 && (
-          <Section title='文章'>
-            <ul class='flex flex-col gap-y-1.5 sm:gap-y-2'>
-              {allPostsByDate.map((p) => (
-                <li class='flex flex-col gap-x-2 sm:flex-row'>
-                  <PostPreview post={p} />
-                </li>
-              ))}
-            </ul>
-            <Button title='更多文章' class='w-fit self-end' href='/blog' variant='ahead' />
+          <Section title='文章' class='yz-flat'>
+            <PostList posts={allPostsByDate} />
+            <Button title='更多文章' class='yz-chrome w-fit self-end' href='/blog' variant='ahead' />
           </Section>
         )
       }

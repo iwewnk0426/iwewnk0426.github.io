@@ -1,0 +1,155 @@
+---
+import config from '@/site-config'
+
+const path = Astro.url.pathname
+const isPost = path.startsWith('/blog/') && !/^\/blog\/\d+\/?$/.test(path)
+
+function isCurrent(link: string) {
+  if (link === '/') return path === '/'
+  if (link === '/blog' && (path === '/' || path === '/blog' || path.startsWith('/blog/'))) return true
+  return path === link || path.startsWith(`${link}/`)
+}
+---
+
+<button
+  id='knox-style-toggle'
+  class='knox-style-toggle'
+  type='button'
+  aria-pressed='false'
+  aria-label='切换 Yeezy 样式'
+>
+  <span class='label-pure'>YZY</span>
+  <span class='label-yeezy'>原版</span>
+</button>
+
+<nav class='yz-nav' aria-label='分区'>
+  <button
+    class='yz-plus'
+    type='button'
+    data-state={isPost ? 'back' : 'menu'}
+    aria-label={isPost ? '返回' : '调整密度'}
+  >
+    <span class='yz-line first-line'><span class='yz-bar'></span></span>
+    <span class='yz-line second-line'><span class='yz-bar'></span></span>
+  </button>
+
+  <div class='yz-tabs'>
+    {
+      (config.header.menu ?? []).map((item) => (
+        <a
+          class:list={['yz-tab', { 'is-current': isCurrent(item.link) }]}
+          href={item.link}
+        >
+          {item.title}
+        </a>
+      ))
+    }
+  </div>
+</nav>
+
+<footer class='yz-footer'>
+  <ul>
+    <li><a href='/rss.xml'>RSS</a></li>
+    <li><a href='/about'>关于</a></li>
+    <li><span>© {new Date().getFullYear()} KNOX</span></li>
+  </ul>
+</footer>
+
+<script>
+  const root = document.documentElement
+  const toggle = document.getElementById('knox-style-toggle')
+  const plus = document.querySelector<HTMLButtonElement>('.yz-plus')
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  const isPostPath = (path: string) => path.startsWith('/blog/') && !/^\/blog\/\d+\/?$/.test(path)
+
+  function levels() {
+    return window.innerWidth < 768 ? [3, 2, 1] : [6, 3]
+  }
+
+  let zoomIndex = 0
+
+  function applyZoom() {
+    if (!plus || isPostPath(location.pathname)) return
+    const steps = levels()
+    if (zoomIndex >= steps.length) zoomIndex = 0
+    if (zoomIndex === 0) delete root.dataset.yzCols
+    else root.dataset.yzCols = String(steps[zoomIndex])
+    plus.dataset.state = zoomIndex === steps.length - 1 && zoomIndex !== 0 ? 'back' : 'menu'
+  }
+
+  function setStyle(on: boolean) {
+    if (on) root.dataset.style = 'yeezy'
+    else delete root.dataset.style
+    try {
+      localStorage.setItem('knox-style', on ? 'yeezy' : 'pure')
+    } catch {
+      /* ignore private mode */
+    }
+    if (toggle) toggle.setAttribute('aria-pressed', String(on))
+  }
+
+  toggle?.addEventListener('click', () => {
+    const next = root.dataset.style !== 'yeezy'
+    const run = () => setStyle(next)
+    const view = document as Document & {
+      startViewTransition?: (callback: () => void) => void
+    }
+    if (!reduced && typeof view.startViewTransition === 'function') {
+      view.startViewTransition(run)
+    } else {
+      run()
+    }
+  })
+
+  plus?.addEventListener('click', () => {
+    if (isPostPath(location.pathname)) {
+      if (history.length > 1) history.back()
+      else location.href = '/blog'
+      return
+    }
+    zoomIndex = (zoomIndex + 1) % levels().length
+    applyZoom()
+  })
+
+  document.addEventListener('click', (event) => {
+    if (root.dataset.style !== 'yeezy' || reduced) return
+    if (!(event.target instanceof Element)) return
+    const tile = event.target.closest<HTMLAnchorElement>('a.yz-tile')
+    if (!tile) return
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
+    const grid = tile.closest<HTMLElement>('.yz-grid')
+    if (!grid) return
+    event.preventDefault()
+
+    const tileRect = tile.getBoundingClientRect()
+    const gridRect = grid.getBoundingClientRect()
+    const mobile = window.innerWidth < 768
+    const duration = mobile ? 200 : 300
+    const scale = Math.min(560, window.innerWidth) / tileRect.width
+    const originX = tileRect.left + tileRect.width / 2 - gridRect.left
+    const originY = tileRect.top + tileRect.height / 2 - gridRect.top
+    const tx = window.innerWidth / 2 - (tileRect.left + tileRect.width / 2)
+    const ty =
+      window.innerHeight / 2 - (tileRect.top + (tileRect.height - 24 * scale) / 2) - (mobile ? 88 : 96)
+
+    grid.style.transformOrigin = `${originX}px ${originY}px`
+    grid.style.transition = `transform ${duration}ms linear, opacity ${duration}ms cubic-bezier(.4,0,.2,1)`
+    grid.querySelectorAll<HTMLElement>('.yz-tile').forEach((item) => {
+      const image = item.querySelector('.yz-img')
+      if (item !== tile) image?.classList.add('is-ghost')
+      item.querySelector('.yz-label')?.classList.add('is-gone')
+      item.querySelector('.yz-sub')?.classList.add('is-gone')
+    })
+    requestAnimationFrame(() => {
+      grid.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`
+      grid.style.opacity = '0.8'
+    })
+    window.setTimeout(() => {
+      location.href = tile.href
+    }, duration)
+  })
+
+  if (root.dataset.style === 'yeezy') toggle?.setAttribute('aria-pressed', 'true')
+  applyZoom()
+</script>
