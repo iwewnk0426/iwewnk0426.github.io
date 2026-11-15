@@ -1,8 +1,8 @@
 ---
-import { PostPreview } from 'astro-pure/components/pages'
 import { getBlogCollection, groupCollectionsByYear, sortMDByDate } from 'astro-pure/server'
 import { Button } from 'astro-pure/user'
 import PageLayout from '@/layouts/BaseLayout.astro'
+import PostList from '@/components/PostList.astro'
 
 export const prerender = true
 
@@ -17,7 +17,7 @@ const meta = {
 ---
 
 <PageLayout {meta}>
-  <Button title='Back' href='/blog' variant='back' />
+  <Button title='Back' href='/blog' variant='back' class='yz-chrome' />
 
   <main class='mt-6 lg:mt-10'>
     <div id='content-header' class='animate'>
@@ -39,11 +39,7 @@ const meta = {
             <p class='px-5 text-muted-foreground'>
               {posts.length} post{posts.length > 1 && 's'}
             </p>
-            <ul class='flex flex-col text-start'>
-              {posts.map((p) => (
-                <PostPreview post={p} class='border-0 bg-transparent py-2' />
-              ))}
-            </ul>
+            <PostList posts={posts} />
           </div>
         ))
       }
