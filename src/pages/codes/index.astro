@@ -1,0 +1,65 @@
+---
+import { getBlogCollection } from 'astro-pure/server'
+import { Button } from 'astro-pure/user'
+import PageLayout from '@/layouts/BaseLayout.astro'
+import { assignPostCodes, categoryCodeStems } from '@/plugins/post-codes'
+
+const posts = await getBlogCollection()
+const codes = assignPostCodes(posts)
+const rows = posts
+  .map((post) => ({
+    code: codes.get(post.id) ?? '',
+    title: post.data.title,
+    href: `/blog/${post.id}`
+  }))
+  .sort((a, b) => a.code.localeCompare(b.code) || a.title.localeCompare(b.title, 'zh-CN'))
+
+const legend = Object.entries(categoryCodeStems)
+
+const meta = {
+  description: '文章编号怎么排：分类字母和两位序号。',
+  title: '编号说明'
+}
+---
+
+<PageLayout {meta}>
+  <Button title='Back' href='/' variant='back' class='yz-chrome' />
+  <main class='code-page mt-6 lg:mt-10'>
+    <h1 class='mb-6 text-3xl font-medium'>编号说明</h1>
+
+    <p class='mb-6 text-muted-foreground'>
+      Yeezy 模式里，每篇文章有一个货号式编号。分类用两个大写字母，后面是该分类里的两位序号。序号在构建网站时自动算好，不用写进文章。
+    </p>
+
+    <h2 class='mb-3 text-xl font-medium'>分类代码</h2>
+    <ul class='code-legend mb-8 flex list-none flex-col gap-2 p-0'>
+      {
+        legend.map(([name, code]) => (
+          <li class='flex items-baseline gap-3'>
+            <span class='code-token font-medium'>{code}</span>
+            <span>{name}</span>
+          </li>
+        ))
+      }
+    </ul>
+
+    <h2 class='mb-3 text-xl font-medium'>序号</h2>
+    <p class='mb-8 text-muted-foreground'>
+      同一分类里按发布日期从早到晚排，最早的是 01。同一天发布的文章再按文件名排序。以后新写的文章会自动接到该分类的下一个号。表里没有的新分类，用分类名里的前两个英文字母；没有英文字母时用 XX。
+    </p>
+
+    <h2 class='mb-3 text-xl font-medium'>现有文章</h2>
+    <ul class='code-list flex list-none flex-col gap-3 p-0'>
+      {
+        rows.map((row) => (
+          <li>
+            <a class='flex items-baseline gap-3' href={row.href}>
+              <span class='code-token font-medium'>{row.code}</span>
+              <span class='code-title'>{row.title}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </main>
+</PageLayout>
