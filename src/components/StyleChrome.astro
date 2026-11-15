@@ -1,11 +1,15 @@
 ---
-import config from '@/site-config'
-
 const path = Astro.url.pathname
 const isPost = path.startsWith('/blog/') && !/^\/blog\/\d+\/?$/.test(path)
 
+const yeezyNav = [
+  { title: 'BLOG', link: '/blog' },
+  { title: 'CATS', link: '/categories' },
+  { title: 'TAGS', link: '/tags' },
+  { title: 'ABOUT', link: '/about' }
+]
+
 function isCurrent(link: string) {
-  if (link === '/') return path === '/'
   if (link === '/blog' && (path === '/' || path === '/blog' || path.startsWith('/blog/'))) return true
   return path === link || path.startsWith(`${link}/`)
 }
@@ -19,7 +23,7 @@ function isCurrent(link: string) {
   aria-label='切换 Yeezy 样式'
 >
   <span class='label-pure'>YZY</span>
-  <span class='label-yeezy'>原版</span>
+  <span class='label-yeezy'>PURE</span>
 </button>
 
 <nav class='yz-nav' aria-label='分区'>
@@ -35,11 +39,8 @@ function isCurrent(link: string) {
 
   <div class='yz-tabs'>
     {
-      (config.header.menu ?? []).map((item) => (
-        <a
-          class:list={['yz-tab', { 'is-current': isCurrent(item.link) }]}
-          href={item.link}
-        >
+      yeezyNav.map((item) => (
+        <a class:list={['yz-tab', { 'is-current': isCurrent(item.link) }]} href={item.link}>
           {item.title}
         </a>
       ))

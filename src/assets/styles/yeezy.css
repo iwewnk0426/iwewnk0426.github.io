@@ -67,7 +67,20 @@ html[data-style='yeezy'] #main-container {
 }
 
 html[data-style='yeezy'] main {
+  width: 100% !important;
+  max-width: none !important;
+  align-items: stretch !important;
   margin-top: 0 !important;
+}
+
+html[data-style='yeezy'] main > #content,
+html[data-style='yeezy'] .yz-flat,
+html[data-style='yeezy'] .yz-flat > div,
+html[data-style='yeezy'] .blog-layout,
+html[data-style='yeezy'] .blog-layout > section {
+  width: 100% !important;
+  max-width: none !important;
+  align-self: stretch;
 }
 
 .knox-style-toggle {
@@ -95,14 +108,17 @@ html[data-style='yeezy'] main {
 }
 
 html[data-style='yeezy'] .knox-style-toggle {
-  top: 8px;
+  top: 20px;
   right: 16px;
   bottom: auto;
-  width: 48px;
-  height: 48px;
+  width: auto;
+  min-width: 0;
+  height: 24px;
+  padding: 0;
   border: 0;
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
 }
 
 html[data-style='yeezy'] .knox-style-toggle .label-pure {
@@ -143,7 +159,7 @@ html[data-style='yeezy'] .yz-nav {
   top: 8px;
   left: 16px;
   display: flex;
-  width: 48px;
+  width: 16px;
   height: 48px;
   align-items: center;
   justify-content: center;
@@ -202,8 +218,10 @@ html[data-style='yeezy'] .yz-nav {
 
 .yz-tabs {
   display: flex;
+  flex-wrap: nowrap;
   gap: 16px;
   align-items: center;
+  max-width: calc(100% - 128px);
 }
 
 .yz-tab {
@@ -274,9 +292,11 @@ html[data-style='yeezy'] .pure-posts {
 
 html[data-style='yeezy'] .yz-grid {
   display: grid;
+  width: 100%;
+  box-sizing: border-box;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 16px;
-  justify-items: center;
+  justify-items: stretch;
   padding: 0 16px 32px;
 }
 
@@ -300,9 +320,11 @@ html[data-style='yeezy'][data-yz-cols='3'] .yz-grid {
 
 .yz-tile {
   display: flex;
-  width: min(500px, 100%);
+  width: 100%;
+  min-width: 0;
   flex-direction: column;
   align-items: center;
+  gap: 0;
   color: #000;
   text-align: center;
   text-decoration: none;
@@ -315,8 +337,28 @@ html[data-style='yeezy'][data-yz-cols='3'] .yz-grid {
   aspect-ratio: 1 / 1;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  padding: 0;
+  overflow: hidden;
   transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.yz-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: yz-fade 500ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.yz-ph {
+  color: #d0d0d0;
+  font-size: clamp(28px, 18cqi, 64px);
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.yz-img {
+  container-type: inline-size;
 }
 
 .yz-tile:hover .yz-img {

@@ -52,3 +52,17 @@ export function assignPostCodes(posts: CodePost[]): Map<string, string> {
   }
   return codes
 }
+
+/** Cover image, or the first markdown/HTML image in the post body. */
+export function firstPostImage(post: {
+  body?: string
+  data: { heroImage?: { src?: unknown } }
+}): string | undefined {
+  const src = post.data.heroImage?.src
+  if (typeof src === 'string') return src
+  if (src && typeof src === 'object' && 'src' in src && typeof src.src === 'string') return src.src
+  const markdown = post.body?.match(/!\[[^\]]*]\(\s*<?([^)\s>]+)>?/)
+  if (markdown) return markdown[1]
+  const html = post.body?.match(/<img[^>]+src=["']([^"']+)["']/i)
+  return html?.[1]
+}

@@ -4,7 +4,7 @@ import type { CollectionEntry } from 'astro:content'
 import { PostPreview } from 'astro-pure/components/pages'
 import { getBlogCollection } from 'astro-pure/server'
 
-import { assignPostCodes } from '@/plugins/post-codes'
+import { assignPostCodes, categoryPrefix, firstPostImage } from '@/plugins/post-codes'
 
 interface Props {
   posts: CollectionEntry<'blog'>[]
@@ -24,7 +24,13 @@ const codes = assignPostCodes(await getBlogCollection())
   {
     posts.map((post) => (
       <a class='yz-tile' href={`/blog/${post.id}`}>
-        <span class='yz-img'></span>
+        <span class='yz-img'>
+          {firstPostImage(post) ? (
+            <img src={firstPostImage(post)} alt='' />
+          ) : (
+            <span class='yz-ph'>{categoryPrefix(post.data.category)}</span>
+          )}
+        </span>
         <span class='yz-label'>{codes.get(post.id)}</span>
       </a>
     ))
